@@ -2,40 +2,28 @@ import Link from "next/link";
 import { ArrowRight, Brush, Calendar, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BackgroundPaths } from "@/components/BackgroundPaths";
+import fs from "fs";
+import path from "path";
+import PaintingJobsCarousel from "@/components/PaintingJobsCarousel";
 
-// Sample data for featured jobs
-const featuredJobs = [
-  {
-    id: "1",
-    title: "Commercial Building Exterior",
-    location: "New York, NY",
-    timeline: "2-3 weeks",
-    image: "/placeholder.svg?height=300&width=400",
-  },
-  {
-    id: "2",
-    title: "Residential Interior Painting",
-    location: "Los Angeles, CA",
-    timeline: "1-2 weeks",
-    image: "/placeholder.svg?height=300&width=400",
-  },
-  {
-    id: "3",
-    title: "Office Space Renovation",
-    location: "Chicago, IL",
-    timeline: "3-4 weeks",
-    image: "/placeholder.svg?height=300&width=400",
-  },
-  {
-    id: "4",
-    title: "Apartment Complex Hallways",
-    location: "Miami, FL",
-    timeline: "4-6 weeks",
-    image: "/placeholder.svg?height=300&width=400",
-  },
-];
+// Function to get all painting job images
+function getPaintingJobImages() {
+  const directory = path.join(process.cwd(), "public", "PaintingJobs");
+  const fileNames = fs.readdirSync(directory);
+
+  // Filter for image files (jpg, jpeg, png)
+  const imageFiles = fileNames.filter((file) =>
+    /\.(jpg|jpeg|png)$/i.test(file)
+  );
+
+  // Map to image paths
+  return imageFiles.map((fileName) => `/PaintingJobs/${fileName}`);
+}
 
 export default function Home() {
+  // Get all painting job images
+  const paintingJobImages = getPaintingJobImages();
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -105,42 +93,24 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Jobs Section */}
+      {/* Painting Jobs Showcase Section */}
       <section className="py-16 md:py-24 bg-secondary">
         <div className="container">
           <div className="flex justify-between items-center mb-12">
-            <h2 className="text-3xl font-bold">Featured Jobs</h2>
+            <h2 className="text-3xl font-bold">Our Recent Projects</h2>
             <Button variant="outline" asChild>
-              <Link href="/jobs" className="flex items-center gap-2">
-                View All Jobs <ArrowRight className="h-4 w-4" />
+              <Link href="/services" className="flex items-center gap-2">
+                View All Services <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredJobs.map((job) => (
-              <Link
-                key={job.id}
-                href={`/jobs/${job.id}`}
-                className="group block bg-background border border-border rounded-lg overflow-hidden transition-all hover:shadow-md fade-in"
-              >
-                <div className="aspect-[3/2] overflow-hidden">
-                  <img
-                    src={job.image || "/placeholder.svg"}
-                    alt={job.title}
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-medium mb-2 group-hover:text-primary transition-colors">
-                    {job.title}
-                  </h3>
-                  <div className="text-sm text-muted-foreground">
-                    <p>{job.location}</p>
-                    <p>Timeline: {job.timeline}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+          <div className="space-y-8">
+            <p className="text-muted-foreground max-w-3xl">
+              Browse through our gallery of recently completed painting
+              projects. These images showcase our quality workmanship and
+              attention to detail.
+            </p>
+            <PaintingJobsCarousel images={paintingJobImages} />
           </div>
         </div>
       </section>

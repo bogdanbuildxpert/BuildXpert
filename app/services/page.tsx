@@ -2,6 +2,9 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import fs from "fs";
+import path from "path";
+import PaintingJobsCarousel from "@/components/PaintingJobsCarousel";
 
 // Sample services data
 const services = [
@@ -48,6 +51,20 @@ const services = [
     image: "/images/_11c61720-faec-4c60-b554-bf219ca64c23.jpeg",
   },
 ];
+
+// Function to get all painting job images
+function getPaintingJobImages() {
+  const directory = path.join(process.cwd(), "public", "PaintingJobs");
+  const fileNames = fs.readdirSync(directory);
+
+  // Filter for image files (jpg, jpeg, png)
+  const imageFiles = fileNames.filter((file) =>
+    /\.(jpg|jpeg|png)$/i.test(file)
+  );
+
+  // Map to image paths
+  return imageFiles.map((fileName) => `/PaintingJobs/${fileName}`);
+}
 
 export default function ServicesPage() {
   return (

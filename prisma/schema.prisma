@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Connection configuration
+  relationMode = "foreignKeys"
+}
+
+// User model for authentication and user management
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          UserRole  @default(CLIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+  jobs          Job[]     @relation("AppliedJobs")
+  postedJobs    Job[]     @relation("JobPoster")
+  services      Service[] @relation("ServiceProvider")
+  reviews       Review[]  @relation("ReviewAuthor")
+  receivedReviews Review[] @relation("ReviewReceiver")
+  sentMessages  Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+
+  @@index([role])
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+// Project model for construction/building projects
+model Project {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  budget      Float?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      ProjectStatus @default(PLANNING)
+  location    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  clientId    String
+  client      User      @relation(fields: [clientId], references: [id])
+  tasks       Task[]
+  materials   Material[]
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// Task model for project tasks
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Material model for tracking construction materials
+model Material {
+  id          String    @id @default(cuid())
+  name        String
+  quantity    Float
+  unit        String
+  price       Float?
+  supplier    String?
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Job model for job listings
+model Job {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  location    String?
+  salary      Float?
+  type        JobType   @default(FULL_TIME)
+  status      JobStatus @default(OPEN)
+  posterId    String
+  poster      User      @relation("JobPoster", fields: [posterId], references: [id])
+  applicants  User[]    @relation("AppliedJobs")
+  messages    Message[] @relation("JobMessages")
+  metadata    Json?     // Added metadata field to store additional job details
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([posterId])
+  @@index([status])
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+  FILLED
+}
+
+// Service model for construction services
+model Service {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  price       Float?
+  duration    String?
+  providerId  String
+  provider    User      @relation("ServiceProvider", fields: [providerId], references: [id])
+  reviews     Review[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Review model for service and user reviews
+model Review {
+  id          String    @id @default(cuid())
+  rating      Int       @default(0)
+  comment     String?
+  authorId    String
+  author      User      @relation("ReviewAuthor", fields: [authorId], references: [id])
+  receiverId  String
+  receiver    User      @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  serviceId   String?
+  service     Service?  @relation(fields: [serviceId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Message model for chat functionality
+model Message {
+  id          String    @id @default(cuid())
+  content     String
+  isRead      Boolean   @default(false)
+  senderId    String
+  sender      User      @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User      @relation("MessageReceiver", fields: [receiverId], references: [id])
+  jobId       String
+  job         Job       @relation("JobMessages", fields: [jobId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([jobId])
+  @@index([senderId, receiverId])
+  @@index([createdAt])
+  @@index([isRead])
+}
+
+// Contact form submissions
+model Contact {
+  id          String    @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  message     String
+  status      ContactStatus @default(NEW)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ContactStatus {
+  NEW
+  REVIEWED
+  RESPONDED
+  ARCHIVED
+}

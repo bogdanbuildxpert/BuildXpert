@@ -1,26 +1,102 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Mail, MapPin, Phone } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 export default function ContactPage() {
-  const [isLoading, setIsLoading] = useState(false)
+  const { user, isLoading: authLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      // Show success message or redirect
-    }, 1500)
-  }
+  // Update form data when user is logged in
+  useEffect(() => {
+    if (user) {
+      // Split the name if available, otherwise use empty strings
+      const nameParts = user.name ? user.name.split(" ") : ["", ""];
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+
+      setFormData((prev) => ({
+        ...prev,
+        firstName,
+        lastName,
+        email: user.email || "",
+      }));
+    }
+  }, [user]);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(
+          "Your message has been sent successfully! A confirmation email has been sent to your inbox.",
+          { duration: 6000 }
+        );
+        // Reset form if not logged in, otherwise keep user data
+        if (!user) {
+          setFormData({
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone: "",
+            subject: "",
+            message: "",
+          });
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            subject: "",
+            message: "",
+          }));
+        }
+      } else {
+        toast.error(data.error || "Failed to send message. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast.error("An error occurred. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="container py-16 md:py-24">
@@ -28,9 +104,20 @@ export default function ContactPage() {
         <div className="space-y-4 max-w-3xl">
           <h1 className="text-3xl md:text-4xl font-bold">Contact Us</h1>
           <p className="text-muted-foreground">
-            Have questions about our services or want to discuss your project? Get in touch with us using the form below
-            or through our contact information.
+            Have questions about our services or want to discuss your project?
+            Get in touch with us using the form below or through our contact
+            information.
           </p>
+          {user && (
+            <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+              <p className="text-sm">
+                Welcome back,{" "}
+                <span className="font-medium">{user.name || user.email}</span>!
+                Your contact information has been pre-filled for your
+                convenience.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -38,36 +125,74 @@ export default function ContactPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first-name">First name</Label>
-                  <Input id="first-name" placeholder="John" required />
+                  <Label htmlFor="firstName">First name</Label>
+                  <Input
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    placeholder="John"
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last-name">Last name</Label>
-                  <Input id="last-name" placeholder="Doe" required />
+                  <Label htmlFor="lastName">Last name</Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="Doe"
+                    required
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="john.doe@example.com" required />
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="john.doe@example.com"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" type="tel" placeholder="+353 1 234 5678" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+353 1 234 5678"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" placeholder="How can we help you?" required />
+                <Input
+                  id="subject"
+                  value={formData.subject}
+                  onChange={handleChange}
+                  placeholder="How can we help you?"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="message">Message</Label>
                 <Textarea
                   id="message"
+                  value={formData.message}
+                  onChange={handleChange}
                   placeholder="Please provide details about your inquiry or project..."
                   className="min-h-[150px]"
                   required
                 />
               </div>
-              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isLoading}
+              >
                 {isLoading ? "Sending..." : "Send Message"}
               </Button>
             </form>
@@ -92,7 +217,10 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-medium">Phone</h3>
                     <p className="text-muted-foreground">
-                      <a href="tel:+35312345678" className="hover:text-foreground transition-colors">
+                      <a
+                        href="tel:+35312345678"
+                        className="hover:text-foreground transition-colors"
+                      >
                         +353 1 234 5678
                       </a>
                     </p>
@@ -103,7 +231,10 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-medium">Email</h3>
                     <p className="text-muted-foreground">
-                      <a href="mailto:info@buildxpert.com" className="hover:text-foreground transition-colors">
+                      <a
+                        href="mailto:info@buildxpert.com"
+                        className="hover:text-foreground transition-colors"
+                      >
                         info@buildxpert.com
                       </a>
                     </p>
@@ -142,6 +273,5 @@ export default function ContactPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

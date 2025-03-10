@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #status {
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .connecting {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      #log {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 20px;
+        background-color: #f8f9fa;
+      }
+      .log-entry {
+        margin-bottom: 5px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+      }
+      .timestamp {
+        color: #6c757d;
+        font-size: 0.8em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Socket.IO Connection Test</h1>
+
+    <div id="status" class="connecting">Connecting to Socket.IO server...</div>
+
+    <h2>Connection Log</h2>
+    <div id="log"></div>
+
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled>Disconnect</button>
+
+    <div>
+      <h2>Send Test Message</h2>
+      <input type="text" id="message" placeholder="Type a message" />
+      <button id="send">Send</button>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const logEl = document.getElementById("log");
+      const connectBtn = document.getElementById("connect");
+      const disconnectBtn = document.getElementById("disconnect");
+      const messageInput = document.getElementById("message");
+      const sendBtn = document.getElementById("send");
+
+      let socket = null;
+
+      function log(message) {
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+
+        const timestamp = document.createElement("span");
+        timestamp.className = "timestamp";
+        timestamp.textContent = new Date().toISOString() + ": ";
+
+        entry.appendChild(timestamp);
+        entry.appendChild(document.createTextNode(message));
+
+        logEl.appendChild(entry);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function updateStatus(status, message) {
+        statusEl.className = status;
+        statusEl.textContent = message;
+      }
+
+      function initSocket() {
+        updateStatus("connecting", "Connecting to Socket.IO server...");
+        log("Initializing Socket.IO connection");
+
+        // Create Socket.IO connection with polling only
+        socket = io(window.location.origin, {
+          path: "/socket.io",
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          transports: ["polling"],
+          forceNew: true,
+          timeout: 20000,
+        });
+
+        // Connection events
+        socket.on("connect", () => {
+          log(`Connected with ID: ${socket.id}`);
+          updateStatus("connected", `Connected with ID: ${socket.id}`);
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          sendBtn.disabled = false;
+
+          // Join a test room
+          socket.emit("join", "test-user");
+          log("Joined room: test-user");
+        });
+
+        socket.on("connect_error", (error) => {
+          log(`Connection error: ${error.message}`);
+          updateStatus("disconnected", `Connection error: ${error.message}`);
+          sendBtn.disabled = true;
+        });
+
+        socket.on("disconnect", (reason) => {
+          log(`Disconnected: ${reason}`);
+          updateStatus("disconnected", `Disconnected: ${reason}`);
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          sendBtn.disabled = true;
+        });
+
+        socket.on("reconnect_attempt", (attemptNumber) => {
+          log(`Reconnection attempt ${attemptNumber}`);
+          updateStatus(
+            "connecting",
+            `Reconnection attempt ${attemptNumber}...`
+          );
+        });
+
+        socket.on("reconnect", (attemptNumber) => {
+          log(`Reconnected after ${attemptNumber} attempts`);
+          updateStatus(
+            "connected",
+            `Reconnected after ${attemptNumber} attempts`
+          );
+          sendBtn.disabled = false;
+        });
+
+        // Custom events
+        socket.on("new_message", (message) => {
+          log(`Received message: ${JSON.stringify(message)}`);
+        });
+
+        socket.on("messages_read", (data) => {
+          log(`Messages read: ${JSON.stringify(data)}`);
+        });
+      }
+
+      // Button event handlers
+      connectBtn.addEventListener("click", () => {
+        if (!socket || socket.disconnected) {
+          initSocket();
+        }
+      });
+
+      disconnectBtn.addEventListener("click", () => {
+        if (socket && socket.connected) {
+          socket.disconnect();
+        }
+      });
+
+      sendBtn.addEventListener("click", () => {
+        if (socket && socket.connected && messageInput.value.trim()) {
+          const testMessage = {
+            id: "test-" + Date.now(),
+            content: messageInput.value.trim(),
+            senderId: "test-user",
+            receiverId: "test-receiver",
+            jobId: "test-job",
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          };
+
+          log(`Sending test message: ${JSON.stringify(testMessage)}`);
+          socket.emit("send_message", testMessage);
+          messageInput.value = "";
+        }
+      });
+
+      // Initialize on page load
+      initSocket();
+      sendBtn.disabled = true;
+    </script>
+  </body>
+</html>

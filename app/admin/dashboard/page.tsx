@@ -1,11 +1,26 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart, Bell, Calendar, Home, MessageSquare, Settings, Users } from "lucide-react"
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  BarChart,
+  Bell,
+  Calendar,
+  Home,
+  MessageSquare,
+  Settings,
+  Users,
+  Mail,
+} from "lucide-react";
 
 // Sample data for the dashboard
 const stats = [
@@ -29,7 +44,7 @@ const stats = [
     value: "€24,500",
     change: "+8% from last month",
   },
-]
+];
 
 const recentJobs = [
   {
@@ -60,10 +75,10 @@ const recentJobs = [
     status: "In Progress",
     date: "2023-05-08",
   },
-]
+];
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -74,7 +89,10 @@ export default function AdminDashboardPage() {
         </div>
         <nav className="flex flex-1 flex-col space-y-1">
           <Button variant="ghost" className="justify-start" asChild>
-            <Link href="/admin/dashboard" className="flex items-center space-x-2">
+            <Link
+              href="/admin/dashboard"
+              className="flex items-center space-x-2"
+            >
               <Home className="h-5 w-5" />
               <span>Dashboard</span>
             </Link>
@@ -92,19 +110,37 @@ export default function AdminDashboardPage() {
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
-            <Link href="/admin/messages" className="flex items-center space-x-2">
+            <Link
+              href="/admin/messages"
+              className="flex items-center space-x-2"
+            >
               <MessageSquare className="h-5 w-5" />
               <span>Messages</span>
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
-            <Link href="/admin/analytics" className="flex items-center space-x-2">
+            <Link
+              href="/admin/contacts"
+              className="flex items-center space-x-2"
+            >
+              <Mail className="h-5 w-5" />
+              <span>Contact Forms</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" className="justify-start" asChild>
+            <Link
+              href="/admin/analytics"
+              className="flex items-center space-x-2"
+            >
               <BarChart className="h-5 w-5" />
               <span>Analytics</span>
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
-            <Link href="/admin/settings" className="flex items-center space-x-2">
+            <Link
+              href="/admin/settings"
+              className="flex items-center space-x-2"
+            >
               <Settings className="h-5 w-5" />
               <span>Settings</span>
             </Link>
@@ -142,11 +178,15 @@ export default function AdminDashboardPage() {
                 {stats.map((stat, index) => (
                   <Card key={index}>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {stat.title}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{stat.value}</div>
-                      <p className="text-xs text-muted-foreground">{stat.change}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {stat.change}
+                      </p>
                     </CardContent>
                   </Card>
                 ))}
@@ -155,7 +195,9 @@ export default function AdminDashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Jobs</CardTitle>
-                  <CardDescription>Overview of the latest job postings</CardDescription>
+                  <CardDescription>
+                    Overview of the latest job postings
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -166,7 +208,9 @@ export default function AdminDashboardPage() {
                       >
                         <div>
                           <p className="font-medium">{job.title}</p>
-                          <p className="text-sm text-muted-foreground">{job.client}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {job.client}
+                          </p>
                         </div>
                         <div className="text-right">
                           <p
@@ -174,13 +218,15 @@ export default function AdminDashboardPage() {
                               job.status === "Completed"
                                 ? "text-green-600"
                                 : job.status === "In Progress"
-                                  ? "text-blue-600"
-                                  : "text-yellow-600"
+                                ? "text-blue-600"
+                                : "text-yellow-600"
                             }`}
                           >
                             {job.status}
                           </p>
-                          <p className="text-sm text-muted-foreground">{job.date}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {job.date}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -193,10 +239,14 @@ export default function AdminDashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Job Management</CardTitle>
-                  <CardDescription>Manage all job postings and applications</CardDescription>
+                  <CardDescription>
+                    Manage all job postings and applications
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Job management content would go here.</p>
+                  <p className="text-muted-foreground">
+                    Job management content would go here.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -205,10 +255,14 @@ export default function AdminDashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>User Management</CardTitle>
-                  <CardDescription>Manage user accounts and permissions</CardDescription>
+                  <CardDescription>
+                    Manage user accounts and permissions
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">User management content would go here.</p>
+                  <p className="text-muted-foreground">
+                    User management content would go here.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -217,10 +271,14 @@ export default function AdminDashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Analytics</CardTitle>
-                  <CardDescription>View detailed analytics and reports</CardDescription>
+                  <CardDescription>
+                    View detailed analytics and reports
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Analytics content would go here.</p>
+                  <p className="text-muted-foreground">
+                    Analytics content would go here.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -228,6 +286,5 @@ export default function AdminDashboardPage() {
         </main>
       </div>
     </div>
-  )
+  );
 }
-

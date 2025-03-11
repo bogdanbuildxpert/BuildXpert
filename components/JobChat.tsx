@@ -44,6 +44,7 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMountedRef = useRef(true);
   const socketRef = useRef<any>(null);
@@ -125,8 +126,9 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     // Set up Socket.IO connection with explicit URL and options
     const socket = io(window.location.origin, {
       path: "/socket.io",
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       // Use only polling to avoid WebSocket issues
       transports: ["polling"],
       forceNew: true,
@@ -138,13 +140,40 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     // Log connection status
     socket.on("connect", () => {
       console.log("Socket.IO connected with ID:", socket.id);
+      setSocketConnected(true);
 
       // Join user-specific room
       socket.emit("join", user.id);
     });
 
+    socket.on("disconnect", () => {
+      console.log("Socket.IO disconnected");
+      setSocketConnected(false);
+    });
+
+    socket.on("reconnect", (attemptNumber: number) => {
+      console.log(`Socket reconnected after ${attemptNumber} attempts`);
+      setSocketConnected(true);
+      // Re-join the room after reconnection
+      socket.emit("join", user.id);
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber: number) => {
+      console.log(`Socket reconnection attempt #${attemptNumber}`);
+    });
+
+    socket.on("reconnect_error", (error: Error) => {
+      console.error("Socket reconnection error:", error);
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("Socket failed to reconnect after all attempts");
+      toast.error("Failed to connect to chat server. Please refresh the page.");
+    });
+
     socket.on("connect_error", (error: Error) => {
       console.error("Socket.IO connection error:", error);
+      setSocketConnected(false);
     });
 
     // Listen for new messages
@@ -267,13 +296,6 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     }
   };
 
-  // Manual refresh function
-  const handleRefresh = () => {
-    if (!isRefreshing) {
-      fetchMessages();
-    }
-  };
-
   // Format date
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -316,17 +338,20 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
             ? `Chat with Job Poster (${messages[0]?.receiver.name || "Client"})`
             : "Chat with Administrator"}
         </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          title="Refresh messages"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-        </Button>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs ${
+              socketConnected ? "text-green-500" : "text-amber-500"
+            }`}
+          >
+            {socketConnected ? "Connected" : "Reconnecting..."}
+            <span
+              className={`inline-block h-2 w-2 rounded-full ml-1 ${
+                socketConnected ? "bg-green-500" : "bg-amber-500 animate-pulse"
+              }`}
+            ></span>
+          </span>
+        </div>
       </div>
 
       <div className="h-[300px] overflow-y-auto p-4 space-y-4">

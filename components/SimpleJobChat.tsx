@@ -44,6 +44,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [deletingMessageIds, setDeletingMessageIds] = useState<Set<string>>(
     new Set()
   );
@@ -88,14 +89,25 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
 
   // Fetch messages
   const fetchMessages = async () => {
-    if (!user) return;
-    setIsLoading(true);
+    if (!user || isRefreshing) return;
+
+    // Set refreshing state
+    setIsRefreshing(true);
+
     try {
       const response = await fetch(
         `/api/messages?jobId=${jobId}&userId=${user.id}`
       );
       if (response.ok) {
         const data = await response.json();
+
+        // Check if there are any new messages
+        const hasNewMessages = data.some(
+          (newMsg: Message) =>
+            !messages.some((existingMsg) => existingMsg.id === newMsg.id)
+        );
+
+        // Update messages state
         setMessages(data);
 
         // Mark messages as read when fetched
@@ -115,6 +127,11 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
 
           // Reset unread count in the notifications context
           resetUnreadCount();
+
+          // Scroll to bottom if there are new messages
+          if (hasNewMessages) {
+            scrollToBottom();
+          }
         }
       }
     } catch (error) {
@@ -122,6 +139,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       toast.error("Failed to load messages");
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -137,7 +155,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     }
   };
 
-  // Initialize Socket.IO and fetch messages
+  // Initialize Socket.IO connection
   useEffect(() => {
     if (!user) return;
 
@@ -147,6 +165,9 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       transports: ["polling"],
       forceNew: true,
       timeout: 20000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socketRef.current = socket;
@@ -155,15 +176,43 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     socket.on("connect", () => {
       console.log("Socket connected with ID:", socket.id);
       socket.emit("join", user.id);
+      setSocketConnected(true);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Socket disconnected");
+      setSocketConnected(false);
+    });
+
+    socket.on("reconnect", (attemptNumber: number) => {
+      console.log(`Socket reconnected after ${attemptNumber} attempts`);
+      setSocketConnected(true);
+      // Re-join the room after reconnection
+      socket.emit("join", user.id);
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber: number) => {
+      console.log(`Socket reconnection attempt #${attemptNumber}`);
+    });
+
+    socket.on("reconnect_error", (error: Error) => {
+      console.error("Socket reconnection error:", error);
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("Socket failed to reconnect after all attempts");
+      toast.error("Failed to connect to chat server. Please refresh the page.");
     });
 
     socket.on("connect_error", (error: Error) => {
       console.error("Socket connection error:", error);
+      setSocketConnected(false);
       toast.error("Failed to connect to chat server");
     });
 
     // Listen for new messages
     socket.on("new_message", (message: Message) => {
+      console.log("Received new message via socket:", message);
       // Only add the message if it's related to this job and hasn't been processed yet
       if (
         message.jobId === jobId &&
@@ -171,6 +220,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       ) {
         processedMessageIds.current.add(message.id);
         setMessages((prevMessages) => [...prevMessages, message]);
+        scrollToBottom();
 
         // Mark the message as read if the current user is the receiver
         if (message.receiverId === user.id) {
@@ -188,10 +238,8 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     scrollToBottom();
 
     return () => {
-      // Clean up Socket.IO connection when component unmounts
-      if (socket) {
-        socket.disconnect();
-      }
+      // Clean up socket connection
+      socket.disconnect();
     };
   }, [user, jobId]);
 
@@ -344,13 +392,6 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     }
   };
 
-  // Function to handle refreshing messages
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchMessages();
-    setIsRefreshing(false);
-  };
-
   if (!canViewChat) {
     return null;
   }
@@ -367,8 +408,22 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
 
   return (
     <div className="border rounded-lg overflow-hidden bg-card">
-      <div className="p-4 border-b bg-muted/50">
+      <div className="p-4 border-b bg-muted/50 flex justify-between items-center">
         <h3 className="font-medium">Job Chat</h3>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs ${
+              socketConnected ? "text-green-500" : "text-amber-500"
+            }`}
+          >
+            {socketConnected ? "Connected" : "Reconnecting..."}
+            <span
+              className={`inline-block h-2 w-2 rounded-full ml-1 ${
+                socketConnected ? "bg-green-500" : "bg-amber-500 animate-pulse"
+              }`}
+            ></span>
+          </span>
+        </div>
       </div>
 
       {/* Messages container */}
@@ -457,19 +512,6 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-10 w-10"
-              title="Refresh messages"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
             </Button>
           </div>
         </form>

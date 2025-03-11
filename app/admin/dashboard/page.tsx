@@ -129,6 +129,30 @@ export default function AdminDashboardPage() {
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
             <Link
+              href="/admin/email-templates"
+              className="flex items-center space-x-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M21 8V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1" />
+                <path d="M3 8h18" />
+                <path d="M9 12h9.5" />
+                <path d="M9 16h9.5" />
+                <path d="M9 20h5" />
+              </svg>
+              <span>Email Templates</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" className="justify-start" asChild>
+            <Link
               href="/admin/analytics"
               className="flex items-center space-x-2"
             >

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { compare } from "bcrypt";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,16 +21,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In a real application, you would verify the password hash here
-    // For example: const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    // For now, we'll do a simple comparison (NOT SECURE for production)
-    const isPasswordValid = password === user.password;
+    // Verify the password using bcrypt
+    const isPasswordValid = await compare(password, user.password);
 
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
+      );
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before logging in",
+          needsVerification: true,
+          email: user.email,
+        },
+        { status: 403 }
       );
     }
 

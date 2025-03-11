@@ -21,6 +21,7 @@ model User {
   name          String?
   email         String    @unique
   password      String
+  emailVerified DateTime?
   role          UserRole  @default(CLIENT)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -195,17 +196,23 @@ model Message {
 
 // Contact form submissions
 model Contact {
-  id          String    @id @default(cuid())
-  name        String
-  email       String
-  phone       String?
-  message     String
-  status      ContactStatus @default(NEW)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String        @id @default(cuid())
+  name            String
+  email           String
+  phone           String?
+  message         String
+  preferredContact ContactMethod @default(EMAIL)
+  status          ContactStatus @default(NEW)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([status])
   @@index([createdAt])
+}
+
+enum ContactMethod {
+  EMAIL
+  PHONE
 }
 
 enum ContactStatus {
@@ -213,4 +220,17 @@ enum ContactStatus {
   REVIEWED
   RESPONDED
   ARCHIVED
+}
+
+// Email templates for automated emails
+model EmailTemplate {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  subject     String
+  content     String    @db.Text
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([name])
 }

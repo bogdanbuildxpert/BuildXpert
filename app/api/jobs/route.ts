@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { cookies } from "next/headers";
 
 // GET all jobs
 export async function GET(request: NextRequest) {
@@ -40,10 +41,39 @@ export async function GET(request: NextRequest) {
 // POST a new job
 export async function POST(request: NextRequest) {
   try {
+    // Verify user authentication
+    const userCookie = cookies().get("user")?.value;
+
+    if (!userCookie) {
+      return NextResponse.json(
+        { error: "Unauthorized. Please log in to post a job." },
+        { status: 401 }
+      );
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userCookie);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid user data. Please log in again." },
+        { status: 401 }
+      );
+    }
+
+    if (!userData.id) {
+      return NextResponse.json(
+        { error: "Invalid user data. Please log in again." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
-    const { title, description, location, salary, type, posterId, metadata } =
-      body;
+    const { title, description, location, salary, type, metadata } = body;
+
+    // Use the user ID from the cookie instead of the one from the request
+    const posterId = userData.id;
 
     const job = await prisma.job.create({
       data: {
@@ -53,7 +83,7 @@ export async function POST(request: NextRequest) {
         salary: salary ? parseFloat(salary) : null,
         type: type || "FULL_TIME",
         posterId,
-        metadata,
+        ...(metadata ? { metadata } : {}),
       },
     });
 

@@ -1,44 +1,151 @@
 import nodemailer from "nodemailer";
+import prisma from "@/lib/prisma";
 
 export const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.EMAIL_SERVER_HOST,
+  port: Number(process.env.EMAIL_SERVER_PORT),
+  secure: process.env.EMAIL_SERVER_SECURE === "true",
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: process.env.EMAIL_SERVER_USER,
+    pass: process.env.EMAIL_SERVER_PASSWORD,
   },
+  dkim: process.env.DKIM_PRIVATE_KEY
+    ? {
+        domainName: process.env.EMAIL_DOMAIN || "gmail.com",
+        keySelector: "default",
+        privateKey: process.env.DKIM_PRIVATE_KEY,
+      }
+    : undefined,
 });
+
+const createEmailLayout = (content: string, unsubscribeLink?: string) => {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>BuildXpert</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 20px 0; text-align: center; border-bottom: 1px solid #eee;">
+            <h1 style="margin: 0; color: #333; font-size: 24px;">BuildXpert</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 30px 0;">
+            ${content}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 20px 0; text-align: center; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+            <p>&copy; ${new Date().getFullYear()} BuildXpert. All rights reserved.</p>
+            <p>123 Construction Ave, Dublin, Ireland</p>
+            ${
+              unsubscribeLink
+                ? `<p><a href="${unsubscribeLink}" style="color: #666; text-decoration: underline;">Unsubscribe</a> from these emails.</p>`
+                : ""
+            }
+            <p>This is a transactional email related to your interaction with BuildXpert.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+};
+
+export async function getProcessedTemplate(
+  templateName: string,
+  replacements: Record<string, string>
+): Promise<{ subject: string; content: string }> {
+  try {
+    // Find the email template in the database
+    const template = await (prisma as any).emailTemplate.findUnique({
+      where: { name: templateName },
+    });
+
+    if (!template) {
+      throw new Error(`Email template "${templateName}" not found`);
+    }
+
+    let { subject, content } = template;
+
+    // Replace placeholders in subject and content
+    Object.entries(replacements).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, "g");
+      subject = subject.replace(regex, value);
+      content = content.replace(regex, value);
+    });
+
+    return { subject, content };
+  } catch (error) {
+    console.error(`Error processing email template "${templateName}":`, error);
+    throw error;
+  }
+}
 
 export const sendVerificationEmail = async (to: string, token: string) => {
   const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${token}`;
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
-    subject: "Verify your BuildXpert account",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Welcome to BuildXpert!</h2>
-        <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" 
-             style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block;">
-            Verify Email Address
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          If you didn't create an account, you can safely ignore this email.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If the button doesn't work, you can also copy and paste this link into your browser:
-          <br>
-          ${verificationLink}
-        </p>
-      </div>
-    `,
-  };
+  try {
+    const { subject, content } = await getProcessedTemplate(
+      "email_verification",
+      {
+        verificationLink,
+      }
+    );
 
-  await transporter.sendMail(mailOptions);
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject,
+      text: `Welcome to BuildXpert! Please verify your email by visiting: ${verificationLink}`,
+      html: createEmailLayout(content),
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+    // Fallback to hardcoded template if database template fails
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
+      <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verificationLink}" 
+           style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+          Verify Email Address
+        </a>
+      </div>
+      <p style="color: #666; font-size: 14px;">
+        If you didn't create an account, you can safely ignore this email.
+      </p>
+      <p style="color: #666; font-size: 14px;">
+        If the button doesn't work, you can also copy and paste this link into your browser:
+        <br>
+        <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
+      </p>
+    `;
+
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject: "Verify your BuildXpert account",
+      text: `Welcome to BuildXpert! Please verify your email by visiting: ${verificationLink}`,
+      html: createEmailLayout(content),
+    };
+
+    await transporter.sendMail(mailOptions);
+  }
 };
 
 export const sendContactConfirmationEmail = async (
@@ -46,32 +153,61 @@ export const sendContactConfirmationEmail = async (
   name: string,
   subject: string
 ) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
-    subject: "We received your message - BuildXpert",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Thank You for Contacting Us!</h2>
-        <p>Hello ${name},</p>
-        <p>We have received your message regarding "${subject}". Thank you for reaching out to BuildXpert.</p>
-        <p>Our team will review your inquiry and get back to you as soon as possible, typically within 1-2 business days.</p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p style="margin: 0; font-weight: bold;">Your request has been logged with the following details:</p>
-          <p style="margin: 10px 0 0 0;">Subject: ${subject}</p>
-          <p style="margin: 5px 0 0 0;">Date: ${new Date().toLocaleDateString()}</p>
-        </div>
-        <p>If you have any additional information to add to your inquiry, please reply to this email.</p>
-        <p>Best regards,</p>
-        <p><strong>The BuildXpert Team</strong></p>
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
-          <p>This is an automated message. Please do not reply directly to this email.</p>
-        </div>
-      </div>
-    `,
-  };
+  try {
+    const { subject: emailSubject, content } = await getProcessedTemplate(
+      "contact_confirmation",
+      {
+        name,
+        subject,
+        date: new Date().toLocaleDateString(),
+      }
+    );
 
-  await transporter.sendMail(mailOptions);
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Customer Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject: emailSubject,
+      text: `Thank you for contacting BuildXpert! We have received your message regarding "${subject}" and will respond within 1-2 business days.`,
+      html: createEmailLayout(content),
+      replyTo: process.env.EMAIL_USER || "",
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending contact confirmation email:", error);
+    // Fallback to hardcoded template if database template fails
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">Thank You for Contacting Us!</h2>
+      <p>Hello ${name},</p>
+      <p>We have received your message regarding "${subject}". Thank you for reaching out to BuildXpert.</p>
+      <p>Our team will review your inquiry and get back to you as soon as possible, typically within 1-2 business days.</p>
+      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="margin: 0; font-weight: bold;">Your request has been logged with the following details:</p>
+        <p style="margin: 10px 0 0 0;">Subject: ${subject}</p>
+        <p style="margin: 5px 0 0 0;">Date: ${new Date().toLocaleDateString()}</p>
+      </div>
+      <p>If you have any additional information to add to your inquiry, please reply to this email.</p>
+      <p>Best regards,</p>
+      <p><strong>The BuildXpert Team</strong></p>
+    `;
+
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Customer Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject: "We received your message - BuildXpert",
+      text: `Thank you for contacting BuildXpert! We have received your message regarding "${subject}" and will respond within 1-2 business days.`,
+      html: createEmailLayout(content),
+      replyTo: process.env.EMAIL_USER || "",
+    };
+
+    await transporter.sendMail(mailOptions);
+  }
 };
 
 export const sendContactNotificationEmail = async (contactData: {
@@ -80,37 +216,140 @@ export const sendContactNotificationEmail = async (contactData: {
   phone?: string;
   subject: string;
   message: string;
+  preferredContact?: string;
 }) => {
-  const { name, email, phone, subject, message } = contactData;
+  const { name, email, phone, subject, message, preferredContact } =
+    contactData;
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_USER, // Send to admin email
-    subject: `New Contact Form Submission: ${subject}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">New Contact Form Submission</h2>
-        <p>A new contact form has been submitted on the BuildXpert website.</p>
-        
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="margin-top: 0;">Contact Details:</h3>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
-          <p><strong>Subject:</strong> ${subject}</p>
-          <p><strong>Message:</strong></p>
-          <div style="background-color: white; padding: 10px; border-radius: 3px;">
-            ${message.replace(/\n/g, "<br>")}
-          </div>
-          <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+  try {
+    const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/contacts`;
+    const { subject: emailSubject, content } = await getProcessedTemplate(
+      "contact_notification",
+      {
+        name,
+        email,
+        phone: phone || "Not provided",
+        subject,
+        message: message.replace(/\n/g, "<br>"),
+        preferredContact: preferredContact === "PHONE" ? "Phone" : "Email",
+        date: new Date().toLocaleString(),
+        adminUrl,
+      }
+    );
+
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Notifications",
+        address: process.env.EMAIL_USER || "",
+      },
+      to: process.env.EMAIL_USER || "",
+      subject: emailSubject,
+      text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
+      html: createEmailLayout(content),
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending contact notification email:", error);
+    // Fallback to hardcoded template if database template fails
+    const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/contacts`;
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">New Contact Form Submission</h2>
+      <p>A new contact form has been submitted on the BuildXpert website.</p>
+      
+      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin-top: 0;">Contact Details:</h3>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
+        <p><strong>Preferred Contact Method:</strong> ${
+          preferredContact === "PHONE" ? "Phone" : "Email"
+        }</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <p><strong>Message:</strong></p>
+        <div style="background-color: white; padding: 10px; border-radius: 3px;">
+          ${message.replace(/\n/g, "<br>")}
         </div>
-        
-        <p>You can view and manage all contact submissions in the <a href="${
-          process.env.NEXT_PUBLIC_APP_URL
-        }/admin/contacts">admin dashboard</a>.</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
       </div>
-    `,
-  };
+      
+      <p>You can view and manage all contact submissions in the <a href="${adminUrl}" style="color: #0070f3;">admin dashboard</a>.</p>
+    `;
 
-  await transporter.sendMail(mailOptions);
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Notifications",
+        address: process.env.EMAIL_USER || "",
+      },
+      to: process.env.EMAIL_USER || "",
+      subject: `New Contact Form Submission: ${subject}`,
+      text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
+      html: createEmailLayout(content),
+      replyTo: email,
+    };
+
+    await transporter.sendMail(mailOptions);
+  }
+};
+
+export const sendPasswordResetEmail = async (to: string, token: string) => {
+  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}`;
+
+  try {
+    const { subject, content } = await getProcessedTemplate("password_reset", {
+      resetLink,
+    });
+
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject,
+      text: `Reset your BuildXpert password by visiting: ${resetLink}. This link will expire in 1 hour.`,
+      html: createEmailLayout(content),
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    // Fallback to hardcoded template if database template fails
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
+      <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetLink}" 
+           style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+          Reset Password
+        </a>
+      </div>
+      <p style="color: #666; font-size: 14px;">
+        This link will expire in 1 hour for security reasons.
+      </p>
+      <p style="color: #666; font-size: 14px;">
+        If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+      </p>
+      <p style="color: #666; font-size: 14px;">
+        If the button doesn't work, you can also copy and paste this link into your browser:
+        <br>
+        <a href="${resetLink}" style="color: #0070f3; word-break: break-all;">${resetLink}</a>
+      </p>
+    `;
+
+    const mailOptions = {
+      from: {
+        name: "BuildXpert Support",
+        address: process.env.EMAIL_USER || "",
+      },
+      to,
+      subject: "Reset Your BuildXpert Password",
+      text: `Reset your BuildXpert password by visiting: ${resetLink}. This link will expire in 1 hour.`,
+      html: createEmailLayout(content),
+    };
+
+    await transporter.sendMail(mailOptions);
+  }
 };

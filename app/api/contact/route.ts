@@ -7,13 +7,31 @@ import {
 
 export async function POST(req: Request) {
   try {
-    const { firstName, lastName, email, phone, subject, message } =
-      await req.json();
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      subject,
+      message,
+      preferredContact,
+    } = await req.json();
 
     // Validate required fields
     if (!firstName || !lastName || !email || !message) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Validate preferred contact method
+    if (preferredContact === "PHONE" && !phone) {
+      return NextResponse.json(
+        {
+          error:
+            "Phone number is required when phone is the preferred contact method",
+        },
         { status: 400 }
       );
     }
@@ -27,6 +45,7 @@ export async function POST(req: Request) {
         email,
         phone: phone || null,
         message: `Subject: ${subject}\n\n${message}`,
+        preferredContact: preferredContact || "EMAIL",
         status: "NEW",
       },
     });
@@ -47,6 +66,7 @@ export async function POST(req: Request) {
         phone,
         subject,
         message,
+        preferredContact,
       });
     } catch (emailError) {
       console.error("Error sending admin notification email:", emailError);

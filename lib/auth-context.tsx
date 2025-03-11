@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 interface User {
   id: string;
@@ -19,13 +20,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage
+    // Check if user is stored in localStorage as a fallback
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    if (storedUser && !session) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (error) {
@@ -33,8 +35,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("user");
       }
     }
-    setIsLoading(false);
-  }, []);
+
+    // If we have a session from NextAuth, use that
+    if (session && session.user) {
+      const nextAuthUser = {
+        id: session.user.id as string,
+        name: session.user.name || null,
+        email: session.user.email as string,
+        role: (session.user as any).role || "CLIENT",
+      };
+      setUser(nextAuthUser);
+
+      // Also update localStorage for backward compatibility
+      localStorage.setItem("user", JSON.stringify(nextAuthUser));
+    }
+
+    setIsLoading(status === "loading");
+  }, [session, status]);
 
   const login = (userData: User) => {
     setUser(userData);
@@ -52,6 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Also clear the user cookie
     document.cookie = "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    // Sign out from NextAuth
+    signOut({ redirect: false });
   };
 
   return (

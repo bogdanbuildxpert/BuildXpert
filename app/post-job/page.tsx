@@ -42,6 +42,10 @@ export default function PostJobPage() {
   const [images, setImages] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [activeAccordion, setActiveAccordion] = useState<string>("client-info");
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
 
   const [formData, setFormData] = useState({
     // Client Information
@@ -70,6 +74,18 @@ export default function PostJobPage() {
     additionalNotes: "",
   });
 
+  // Map fields to their accordion sections
+  const fieldToAccordionMap: Record<string, string> = {
+    email: "client-info",
+    phone: "client-info",
+    jobLocation: "job-details",
+    paintingAreas: "job-details",
+    surfaceCondition: "job-details",
+    colorPreferences: "painting-preferences",
+    specialFinishes: "painting-preferences",
+    estimatedArea: "project-scope",
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -85,6 +101,17 @@ export default function PostJobPage() {
     }
   }, [user, authLoading, router, formData.email]);
 
+  // Clear validation error when a field is updated
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -93,6 +120,7 @@ export default function PostJobPage() {
       ...prev,
       [id]: value,
     }));
+    clearValidationError(id);
   };
 
   const handleSelectChange = (field: string, value: string) => {
@@ -100,6 +128,7 @@ export default function PostJobPage() {
       ...prev,
       [field]: value,
     }));
+    clearValidationError(field);
   };
 
   const handleCheckboxChange = (field: string, checked: boolean) => {
@@ -107,6 +136,7 @@ export default function PostJobPage() {
       ...prev,
       [field]: checked,
     }));
+    clearValidationError(field);
   };
 
   const handleMultiSelectChange = (
@@ -126,19 +156,110 @@ export default function PostJobPage() {
         };
       }
     });
+    clearValidationError(field);
   };
+
+  // Validate all required fields regardless of visibility
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validate required fields
+    if (!formData.email) errors.email = "Email is required";
+    if (!formData.phone) errors.phone = "Phone number is required";
+    if (!formData.jobLocation) errors.jobLocation = "Job location is required";
+    if (formData.paintingAreas.length === 0)
+      errors.paintingAreas = "Select at least one painting area";
+    if (!formData.surfaceCondition)
+      errors.surfaceCondition = "Surface condition is required";
+    if (!formData.colorPreferences)
+      errors.colorPreferences = "Color preferences are required";
+    if (!formData.specialFinishes)
+      errors.specialFinishes = "Special finishes information is required";
+    if (!formData.estimatedArea)
+      errors.estimatedArea = "Estimated area is required";
+
+    setValidationErrors(errors);
+
+    // If there are errors, expand the first accordion with errors
+    if (Object.keys(errors).length > 0) {
+      // Find the first field with an error and get its accordion section
+      const firstErrorField = Object.keys(errors)[0];
+      const accordionToOpen = fieldToAccordionMap[firstErrorField];
+
+      if (accordionToOpen) {
+        setActiveAccordion(accordionToOpen);
+      }
+
+      // Scroll to the top of the form
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // Show toast with error message
+      toast.error("Please fill in all required fields");
+    }
+
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      // Limit to 5 images
+      const filesToProcess = Array.from(e.target.files).slice(0, 5);
+
+      // Process each file to create object URLs
+      const newImages = filesToProcess.map((file) => URL.createObjectURL(file));
+
+      // Store the actual files for later processing
+      const fileReaders = filesToProcess.map((file) => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      // Store the promises for later resolution during form submission
+      setFileReaderPromises(fileReaders);
+
+      // Update the UI with image previews
+      setImages([...images, ...newImages]);
+    }
+  };
+
+  // State to store FileReader promises
+  const [fileReaderPromises, setFileReaderPromises] = useState<
+    Promise<string>[]
+  >([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user) {
       toast.error("You must be logged in to post a job");
+      router.push("/login?from=/post-job");
+      return;
+    }
+
+    // Validate all fields before submission
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
 
     try {
+      // Resolve all image promises to get base64 data
+      let imageData: string[] = [];
+      if (fileReaderPromises.length > 0) {
+        try {
+          imageData = await Promise.all(fileReaderPromises);
+        } catch (error) {
+          console.error("Error processing images:", error);
+          // Continue with submission even if image processing fails
+        }
+      }
+
       // Format the data for submission
       const jobData = {
         title: `Painting Job - ${formData.propertyType} Property in ${
@@ -147,7 +268,6 @@ export default function PostJobPage() {
         description: generateJobDescription(),
         location: formData.jobLocation,
         type: "CONTRACT",
-        posterId: user.id,
         metadata: {
           email: formData.email,
           phone: formData.phone,
@@ -165,6 +285,7 @@ export default function PostJobPage() {
           userName: user.name || user.email,
           startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
           endDate: endDate ? format(endDate, "yyyy-MM-dd") : null,
+          images: imageData, // Add the image data to metadata
         },
       };
 
@@ -174,17 +295,27 @@ export default function PostJobPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(jobData),
+        credentials: "include", // Include cookies in the request
       });
 
       if (!response.ok) {
-        throw new Error("Failed to post job");
+        const errorData = await response.json();
+        if (response.status === 401) {
+          // Unauthorized - redirect to login
+          toast.error("Your session has expired. Please log in again.");
+          router.push("/login?from=/post-job");
+          return;
+        }
+        throw new Error(errorData.error || "Failed to post job");
       }
 
       toast.success("Job posted successfully");
       router.push("/jobs");
     } catch (error) {
       console.error("Error posting job:", error);
-      toast.error("Failed to post job");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to post job"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -209,15 +340,6 @@ Additional Requirements: ${
     }${formData.scaffolding ? "Scaffolding required. " : ""}
 Additional Notes: ${formData.additionalNotes}
     `.trim();
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newImages = Array.from(e.target.files).map((file) =>
-        URL.createObjectURL(file)
-      );
-      setImages([...images, ...newImages]);
-    }
   };
 
   // Function to clear a date
@@ -307,17 +429,26 @@ Additional Notes: ${formData.additionalNotes}
           <Accordion
             type="single"
             collapsible
-            defaultValue="client-info"
+            value={activeAccordion}
+            onValueChange={setActiveAccordion}
             className="w-full"
           >
             {/* Client Information Section */}
             <AccordionItem value="client-info">
               <AccordionTrigger className="text-lg font-semibold">
                 Client Information
+                {(validationErrors.email || validationErrors.phone) && (
+                  <span className="ml-2 text-sm text-destructive">
+                    ● Required fields missing
+                  </span>
+                )}
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email" className="flex items-center">
+                    Email Address
+                    <span className="text-destructive ml-1">*</span>
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -325,18 +456,37 @@ Additional Notes: ${formData.additionalNotes}
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    className={
+                      validationErrors.email ? "border-destructive" : ""
+                    }
                   />
+                  {validationErrors.email && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone" className="flex items-center">
+                    Phone Number
+                    <span className="text-destructive ml-1">*</span>
+                  </Label>
                   <Input
                     id="phone"
                     placeholder="Enter your phone number"
                     value={formData.phone}
                     onChange={handleChange}
                     required
+                    className={
+                      validationErrors.phone ? "border-destructive" : ""
+                    }
                   />
+                  {validationErrors.phone && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.phone}
+                    </p>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -345,6 +495,13 @@ Additional Notes: ${formData.additionalNotes}
             <AccordionItem value="job-details">
               <AccordionTrigger className="text-lg font-semibold">
                 Job Details
+                {(validationErrors.jobLocation ||
+                  validationErrors.paintingAreas ||
+                  validationErrors.surfaceCondition) && (
+                  <span className="ml-2 text-sm text-destructive">
+                    ● Required fields missing
+                  </span>
+                )}
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -381,8 +538,12 @@ Additional Notes: ${formData.additionalNotes}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="jobLocation" className="text-sm font-medium">
+                  <Label
+                    htmlFor="jobLocation"
+                    className="flex items-center text-sm font-medium"
+                  >
                     Job Location (Full Address)
+                    <span className="text-destructive ml-1">*</span>
                   </Label>
                   <Textarea
                     id="jobLocation"
@@ -390,65 +551,200 @@ Additional Notes: ${formData.additionalNotes}
                     value={formData.jobLocation}
                     onChange={handleChange}
                     required
-                    className="min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className={cn(
+                      "min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm",
+                      validationErrors.jobLocation ? "border-destructive" : ""
+                    )}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Please provide the complete address where the painting work
-                    will be done
-                  </p>
+                  {validationErrors.jobLocation ? (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.jobLocation}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Please provide the complete address where the painting
+                      work will be done
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Areas to Be Painted</Label>
+                  <Label className="flex items-center">
+                    Areas to be Painted
+                    <span className="text-destructive ml-1">*</span>
+                  </Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {[
-                      "Walls",
-                      "Ceilings",
-                      "Woodwork",
-                      "Furniture",
-                      "Exterior",
-                      "Other",
-                    ].map((area) => (
-                      <div key={area} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`area-${area.toLowerCase()}`}
-                          checked={formData.paintingAreas.includes(
-                            area.toLowerCase()
-                          )}
-                          onCheckedChange={(checked) =>
-                            handleMultiSelectChange(
-                              "paintingAreas",
-                              area.toLowerCase(),
-                              checked as boolean
-                            )
-                          }
-                        />
-                        <Label htmlFor={`area-${area.toLowerCase()}`}>
-                          {area}
-                        </Label>
-                      </div>
-                    ))}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="interior-walls"
+                        checked={formData.paintingAreas.includes(
+                          "Interior Walls"
+                        )}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Interior Walls",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="interior-walls">Interior Walls</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="exterior-walls"
+                        checked={formData.paintingAreas.includes(
+                          "Exterior Walls"
+                        )}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Exterior Walls",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="exterior-walls">Exterior Walls</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="ceilings"
+                        checked={formData.paintingAreas.includes("Ceilings")}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Ceilings",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="ceilings">Ceilings</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="trim"
+                        checked={formData.paintingAreas.includes(
+                          "Trim/Woodwork"
+                        )}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Trim/Woodwork",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="trim">Trim/Woodwork</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="doors"
+                        checked={formData.paintingAreas.includes("Doors")}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Doors",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="doors">Doors</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="cabinets"
+                        checked={formData.paintingAreas.includes("Cabinets")}
+                        onCheckedChange={(checked) =>
+                          handleMultiSelectChange(
+                            "paintingAreas",
+                            "Cabinets",
+                            checked as boolean
+                          )
+                        }
+                        className={
+                          validationErrors.paintingAreas
+                            ? "border-destructive"
+                            : ""
+                        }
+                      />
+                      <Label htmlFor="cabinets">Cabinets</Label>
+                    </div>
                   </div>
+                  {validationErrors.paintingAreas && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.paintingAreas}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label
                     htmlFor="surfaceCondition"
-                    className="text-sm font-medium"
+                    className="flex items-center"
                   >
                     Surface Condition
+                    <span className="text-destructive ml-1">*</span>
                   </Label>
-                  <Textarea
-                    id="surfaceCondition"
-                    placeholder="Describe any damage (cracks, holes), old paint removal required, or special preparation needed"
+                  <Select
                     value={formData.surfaceCondition}
-                    onChange={handleChange}
-                    className="min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Detailed information about surface conditions helps painters
-                    prepare accurate quotes
-                  </p>
+                    onValueChange={(value) =>
+                      handleSelectChange("surfaceCondition", value)
+                    }
+                  >
+                    <SelectTrigger
+                      className={
+                        validationErrors.surfaceCondition
+                          ? "border-destructive"
+                          : ""
+                      }
+                    >
+                      <SelectValue placeholder="Select surface condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">
+                        New Surface (Never Painted)
+                      </SelectItem>
+                      <SelectItem value="good">
+                        Good Condition (Minor Repairs)
+                      </SelectItem>
+                      <SelectItem value="fair">
+                        Fair Condition (Some Repairs Needed)
+                      </SelectItem>
+                      <SelectItem value="poor">
+                        Poor Condition (Major Repairs Needed)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {validationErrors.surfaceCondition && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.surfaceCondition}
+                    </p>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -457,38 +753,45 @@ Additional Notes: ${formData.additionalNotes}
             <AccordionItem value="painting-preferences">
               <AccordionTrigger className="text-lg font-semibold">
                 Painting Preferences
+                {(validationErrors.colorPreferences ||
+                  validationErrors.specialFinishes) && (
+                  <span className="ml-2 text-sm text-destructive">
+                    ● Required fields missing
+                  </span>
+                )}
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label>Paint Type</Label>
-                  <Select
+                  <RadioGroup
                     value={formData.paintType}
                     onValueChange={(value) =>
                       handleSelectChange("paintType", value)
                     }
+                    className="flex flex-col space-y-2"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select paint type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="normal">Standard Paint</SelectItem>
-                      <SelectItem value="eco-friendly">
-                        Eco-Friendly Paint
-                      </SelectItem>
-                      <SelectItem value="premium">Premium Paint</SelectItem>
-                      <SelectItem value="specialized">
-                        Specialized Paint
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="normal" id="paint-normal" />
+                      <Label htmlFor="paint-normal">Standard Paint</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="premium" id="paint-premium" />
+                      <Label htmlFor="paint-premium">Premium Paint</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="eco" id="paint-eco" />
+                      <Label htmlFor="paint-eco">Eco-Friendly Paint</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
 
                 <div className="space-y-2">
                   <Label
                     htmlFor="colorPreferences"
-                    className="text-sm font-medium"
+                    className="flex items-center text-sm font-medium"
                   >
                     Color Preferences
+                    <span className="text-destructive ml-1">*</span>
                   </Label>
                   <Textarea
                     id="colorPreferences"
@@ -496,24 +799,51 @@ Additional Notes: ${formData.additionalNotes}
                     value={formData.colorPreferences}
                     onChange={handleChange}
                     required
-                    className="min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className={cn(
+                      "min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm",
+                      validationErrors.colorPreferences
+                        ? "border-destructive"
+                        : ""
+                    )}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Include color codes, brand preferences, or describe the
-                    desired color scheme
-                  </p>
+                  {validationErrors.colorPreferences ? (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.colorPreferences}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Include color codes, brand preferences, or describe the
+                      desired color scheme
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Special Finishes</Label>
+                  <Label
+                    htmlFor="specialFinishes"
+                    className="flex items-center"
+                  >
+                    Special Finishes
+                    <span className="text-destructive ml-1">*</span>
+                  </Label>
                   <Textarea
                     id="specialFinishes"
                     placeholder="List special finishes separated by commas"
                     value={formData.specialFinishes}
                     onChange={handleChange}
                     required
-                    className="min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className={cn(
+                      "min-h-[80px] max-h-[80px] resize-none focus:ring-2 focus:ring-primary/20 transition-all text-sm",
+                      validationErrors.specialFinishes
+                        ? "border-destructive"
+                        : ""
+                    )}
                   />
+                  {validationErrors.specialFinishes && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.specialFinishes}
+                    </p>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -522,17 +852,33 @@ Additional Notes: ${formData.additionalNotes}
             <AccordionItem value="project-scope">
               <AccordionTrigger className="text-lg font-semibold">
                 Project Scope
+                {validationErrors.estimatedArea && (
+                  <span className="ml-2 text-sm text-destructive">
+                    ● Required fields missing
+                  </span>
+                )}
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="estimatedArea">Estimated Area</Label>
+                  <Label htmlFor="estimatedArea" className="flex items-center">
+                    Estimated Area (in square meters/feet)
+                    <span className="text-destructive ml-1">*</span>
+                  </Label>
                   <Input
                     id="estimatedArea"
-                    placeholder="Square meters of the painting area"
+                    placeholder="e.g., 100 sq. meters"
                     value={formData.estimatedArea}
                     onChange={handleChange}
                     required
+                    className={
+                      validationErrors.estimatedArea ? "border-destructive" : ""
+                    }
                   />
+                  {validationErrors.estimatedArea && (
+                    <p className="text-xs text-destructive mt-1">
+                      {validationErrors.estimatedArea}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

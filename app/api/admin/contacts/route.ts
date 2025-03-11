@@ -1,15 +1,31 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { transporter } from "@/lib/email";
+import { cookies } from "next/headers";
 
 export async function GET(req: Request) {
   try {
-    // Check if user is authenticated and is an admin
-    const session = await getServerSession(authOptions);
+    // Check if user is authenticated and is an admin using cookies
+    const userCookie = cookies().get("user")?.value;
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!userCookie) {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin access required." },
+        { status: 403 }
+      );
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userCookie);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid user data." },
+        { status: 403 }
+      );
+    }
+
+    if (userData.role !== "ADMIN" && userData.role !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }
@@ -58,10 +74,27 @@ export async function GET(req: Request) {
 // Update contact status
 export async function PATCH(req: Request) {
   try {
-    // Check if user is authenticated and is an admin
-    const session = await getServerSession(authOptions);
+    // Check if user is authenticated and is an admin using cookies
+    const userCookie = cookies().get("user")?.value;
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!userCookie) {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin access required." },
+        { status: 403 }
+      );
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userCookie);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid user data." },
+        { status: 403 }
+      );
+    }
+
+    if (userData.role !== "ADMIN" && userData.role !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }
@@ -95,10 +128,27 @@ export async function PATCH(req: Request) {
 // Send response email to contact
 export async function POST(req: Request) {
   try {
-    // Check if user is authenticated and is an admin
-    const session = await getServerSession(authOptions);
+    // Check if user is authenticated and is an admin using cookies
+    const userCookie = cookies().get("user")?.value;
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!userCookie) {
+      return NextResponse.json(
+        { error: "Unauthorized. Admin access required." },
+        { status: 403 }
+      );
+    }
+
+    let userData;
+    try {
+      userData = JSON.parse(userCookie);
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Invalid user data." },
+        { status: 403 }
+      );
+    }
+
+    if (userData.role !== "ADMIN" && userData.role !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }
@@ -123,24 +173,71 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
+    // Create email content
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">Response to Your Inquiry</h2>
+      <p>Hello ${contact.name},</p>
+      <p>Thank you for contacting BuildXpert. Here is our response to your inquiry:</p>
+      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        ${responseMessage.replace(/\n/g, "<br>")}
+      </div>
+      <p>If you have any further questions, please don't hesitate to contact us.</p>
+      <p>Best regards,</p>
+      <p><strong>The BuildXpert Team</strong></p>
+    `;
+
+    // Create email layout
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>BuildXpert</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse: collapse;">
+          <tr>
+            <td style="padding: 20px 0; text-align: center; border-bottom: 1px solid #eee;">
+              <img src="${
+                process.env.NEXT_PUBLIC_APP_URL
+              }/favicon.svg" alt="BuildXpert Logo" width="40" style="display: inline-block;">
+              <h1 style="margin: 10px 0 0; color: #333; font-size: 24px;">BuildXpert</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px 0;">
+              ${content}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 0; text-align: center; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+              <p>&copy; ${new Date().getFullYear()} BuildXpert. All rights reserved.</p>
+              <p>123 Construction Ave, Dublin, Ireland</p>
+              <p>This is a response to your inquiry with BuildXpert.</p>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
     // Send response email
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: {
+        name: "BuildXpert Support",
+        address: process.env.EMAIL_USER || "",
+      },
       to: contact.email,
       subject: responseSubject || "Response to your inquiry - BuildXpert",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Response to Your Inquiry</h2>
-          <p>Hello ${contact.name},</p>
-          <p>Thank you for contacting BuildXpert. Here is our response to your inquiry:</p>
-          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            ${responseMessage.replace(/\n/g, "<br>")}
-          </div>
-          <p>If you have any further questions, please don't hesitate to contact us.</p>
-          <p>Best regards,</p>
-          <p><strong>The BuildXpert Team</strong></p>
-        </div>
-      `,
+      text: `Hello ${contact.name}, Thank you for contacting BuildXpert. Here is our response to your inquiry: ${responseMessage}`,
+      html: emailHtml,
+      replyTo: process.env.EMAIL_USER || "",
+      headers: {
+        "X-Priority": "1",
+        Importance: "high",
+        "X-MSMail-Priority": "High",
+      },
     });
 
     // Update contact status to RESPONDED

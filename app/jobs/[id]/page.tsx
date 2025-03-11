@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { SimpleJobChat } from "@/components/SimpleJobChat";
@@ -37,6 +37,7 @@ interface Job {
     furnitureMoving?: boolean;
     scaffolding?: boolean;
     additionalNotes?: string;
+    images?: string[];
   };
 }
 
@@ -45,6 +46,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Fetch job data
   const fetchJob = useCallback(async () => {
@@ -71,6 +73,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     fetchJob();
   }, [fetchJob]);
+
+  // Function to open image in modal
+  const openImageModal = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+  };
+
+  // Function to close image modal
+  const closeImageModal = () => {
+    setSelectedImage(null);
+  };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -197,6 +209,37 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   <h2 className="text-xl font-semibold">Job Details</h2>
                 </div>
                 <div className="p-6">
+                  {/* Image Gallery */}
+                  {job.metadata.images && job.metadata.images.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium text-foreground mb-3">
+                        Site Photos
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {job.metadata.images.map(
+                          (image: string, index: number) => (
+                            <div
+                              key={index}
+                              className="relative aspect-square rounded-md overflow-hidden border border-border cursor-pointer transition-all hover:opacity-90 hover:shadow-md"
+                              onClick={() => openImageModal(image)}
+                            >
+                              <img
+                                src={image}
+                                alt={`Site photo ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                                <span className="text-white opacity-0 hover:opacity-100 font-medium">
+                                  View
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {job.metadata.propertyType && (
                       <div>
@@ -365,6 +408,29 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          onClick={closeImageModal}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full">
+            <button
+              className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-2 hover:bg-black/80"
+              onClick={closeImageModal}
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="Enlarged view"
+              className="w-full h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

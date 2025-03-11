@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function ContactPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -21,6 +22,7 @@ export default function ContactPage() {
     phone: "",
     subject: "",
     message: "",
+    preferredContact: "EMAIL",
   });
 
   // Update form data when user is logged in
@@ -47,6 +49,13 @@ export default function ContactPage() {
     setFormData((prev) => ({
       ...prev,
       [id]: value,
+    }));
+  };
+
+  const handleRadioChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferredContact: value,
     }));
   };
 
@@ -79,12 +88,14 @@ export default function ContactPage() {
             phone: "",
             subject: "",
             message: "",
+            preferredContact: "EMAIL",
           });
         } else {
           setFormData((prev) => ({
             ...prev,
             subject: "",
             message: "",
+            preferredContact: "EMAIL",
           }));
         }
       } else {
@@ -166,6 +177,41 @@ export default function ContactPage() {
                   placeholder="+353 1 234 5678"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label>Preferred Contact Method</Label>
+                <RadioGroup
+                  value={formData.preferredContact}
+                  onValueChange={handleRadioChange}
+                  className="flex space-x-8 pt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="EMAIL" id="email-contact" />
+                    <Label htmlFor="email-contact" className="cursor-pointer">
+                      <div className="flex items-center">
+                        <Mail className="h-4 w-4 mr-2" />
+                        Email
+                      </div>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="PHONE" id="phone-contact" />
+                    <Label htmlFor="phone-contact" className="cursor-pointer">
+                      <div className="flex items-center">
+                        <Phone className="h-4 w-4 mr-2" />
+                        Phone
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+                {formData.preferredContact === "PHONE" && !formData.phone && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    Please provide a phone number if you prefer to be contacted
+                    by phone.
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="subject">Subject</Label>
                 <Input
@@ -191,7 +237,10 @@ export default function ContactPage() {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={isLoading}
+                disabled={
+                  isLoading ||
+                  (formData.preferredContact === "PHONE" && !formData.phone)
+                }
               >
                 {isLoading ? "Sending..." : "Send Message"}
               </Button>
@@ -218,10 +267,10 @@ export default function ContactPage() {
                     <h3 className="font-medium">Phone</h3>
                     <p className="text-muted-foreground">
                       <a
-                        href="tel:+35312345678"
+                        href="tel:+353838329361"
                         className="hover:text-foreground transition-colors"
                       >
-                        +353 1 234 5678
+                        +353 83 832 9361
                       </a>
                     </p>
                   </div>
@@ -232,10 +281,10 @@ export default function ContactPage() {
                     <h3 className="font-medium">Email</h3>
                     <p className="text-muted-foreground">
                       <a
-                        href="mailto:info@buildxpert.com"
+                        href="mailto:bogdan@buildxpert.ie"
                         className="hover:text-foreground transition-colors"
                       >
-                        info@buildxpert.com
+                        bogdan@buildxpert.ie
                       </a>
                     </p>
                   </div>

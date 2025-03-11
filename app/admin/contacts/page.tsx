@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
   Card,
   CardContent,
@@ -50,6 +50,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash, Phone, Mail } from "lucide-react";
 
 // Define the Contact type
 type Contact = {
@@ -58,6 +70,7 @@ type Contact = {
   email: string;
   phone?: string;
   message: string;
+  preferredContact: "EMAIL" | "PHONE";
   status: "NEW" | "REVIEWED" | "RESPONDED" | "ARCHIVED";
   createdAt: string;
   updatedAt: string;
@@ -72,7 +85,7 @@ type Pagination = {
 };
 
 export default function ContactsPage() {
-  const { data: session, status } = useSession();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -93,15 +106,21 @@ export default function ContactsPage() {
     responseMessage: "",
   });
   const [sendingResponse, setSendingResponse] = useState(false);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Redirect if not admin
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated" && session?.user?.role !== "ADMIN") {
-      router.push("/");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role !== "ADMIN" && user.role !== "admin") {
+        router.push("/");
+      }
     }
-  }, [status, session, router]);
+  }, [isLoading, user, router]);
 
   // Fetch contacts
   const fetchContacts = async (page = 1, status: string | null = null) => {
@@ -151,10 +170,10 @@ export default function ContactsPage() {
 
   // Initial fetch
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.role === "ADMIN") {
+    if (user && user.role === "ADMIN") {
       fetchContacts(1, statusFilter);
     }
-  }, [status, session, statusFilter]);
+  }, [user, statusFilter]);
 
   // Handle status filter change
   const handleStatusFilterChange = (value: string) => {
@@ -243,10 +262,32 @@ export default function ContactsPage() {
     setResponseDialogOpen(true);
   };
 
-  if (
-    status === "loading" ||
-    (status === "authenticated" && session?.user?.role !== "ADMIN")
-  ) {
+  // Handle contact deletion
+  const handleDeleteContact = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/admin/contacts/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast.success("Contact deleted successfully");
+        // Refresh the contacts list
+        fetchContacts(pagination.page, statusFilter);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "Failed to delete contact");
+      }
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      toast.error("An error occurred while deleting the contact");
+    } finally {
+      setIsDeleting(false);
+      setDeletingContactId(null);
+    }
+  };
+
+  if (isLoading || (user && user.role !== "ADMIN")) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Loading...</p>
@@ -303,6 +344,7 @@ export default function ContactsPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
+                    <TableHead>Preferred</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
@@ -317,6 +359,21 @@ export default function ContactsPage() {
                       </TableCell>
                       <TableCell>{contact.email}</TableCell>
                       <TableCell>{contact.phone || "N/A"}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {contact.preferredContact === "PHONE" ? (
+                            <>
+                              <Phone className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-xs">Phone</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-xs">Email</span>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {contact.message}
                       </TableCell>
@@ -358,6 +415,47 @@ export default function ContactsPage() {
                           >
                             Reply
                           </Button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete Contact
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this contact
+                                  submission? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() =>
+                                    handleDeleteContact(contact.id)
+                                  }
+                                  className="bg-red-500 hover:bg-red-600"
+                                  disabled={
+                                    isDeleting &&
+                                    deletingContactId === contact.id
+                                  }
+                                >
+                                  {isDeleting &&
+                                  deletingContactId === contact.id
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>

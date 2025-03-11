@@ -178,7 +178,7 @@ export function Navigation() {
                       )}
                       {isAdmin && (
                         <DropdownMenuItem asChild>
-                          <Link href="/admin">Admin Dashboard</Link>
+                          <Link href="/admin/dashboard">Admin Dashboard</Link>
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
@@ -270,7 +270,7 @@ export function Navigation() {
                   </Link>
                   {isAdmin && (
                     <Link
-                      href="/admin"
+                      href="/admin/dashboard"
                       className="flex items-center py-2 text-sm"
                       onClick={() => setIsMenuOpen(false)}
                     >

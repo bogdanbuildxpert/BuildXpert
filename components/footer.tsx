@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Link from "next/link";
 
 export function Footer() {
   return (
@@ -7,14 +7,19 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <h3 className="text-lg font-medium mb-4">BuildXpert</h3>
-            <p className="text-sm text-muted-foreground">Professional painting services for construction projects.</p>
+            <p className="text-sm text-muted-foreground">
+              Professional painting services for construction projects.
+            </p>
           </div>
 
           <div>
             <h4 className="text-sm font-medium mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/jobs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  href="/jobs"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Jobs
                 </Link>
               </li>
@@ -27,12 +32,18 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  href="/about"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
                   About Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  href="/contact"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Contact
                 </Link>
               </li>
@@ -83,13 +94,19 @@ export function Footer() {
               <p>123 Construction Ave</p>
               <p>Dublin, Ireland</p>
               <p className="mt-2">
-                <a href="mailto:info@constructionpainting.com" className="hover:text-foreground transition-colors">
-                  info@constructionpainting.com
+                <a
+                  href="mailto:bogdan@buildxpert.ie"
+                  className="hover:text-foreground transition-colors"
+                >
+                  bogdan@buildxpert.ie
                 </a>
               </p>
               <p>
-                <a href="tel:+35312345678" className="hover:text-foreground transition-colors">
-                  +353 1 234 5678
+                <a
+                  href="tel:+353838329361"
+                  className="hover:text-foreground transition-colors"
+                >
+                  +353 83 832 9361
                 </a>
               </p>
             </address>
@@ -97,18 +114,25 @@ export function Footer() {
         </div>
 
         <div className="mt-8 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center">
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} BuildXpert. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} BuildXpert. All rights reserved.
+          </p>
           <div className="mt-4 md:mt-0 flex space-x-4">
-            <Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/privacy"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/terms"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
               Terms of Service
             </Link>
           </div>
         </div>
       </div>
     </footer>
-  )
+  );
 }
-

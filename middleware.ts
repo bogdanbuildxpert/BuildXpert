@@ -6,7 +6,11 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Define protected routes that require admin access
-  const isAdminProtectedRoute = path.startsWith("/projects");
+  const isAdminProtectedRoute =
+    path.startsWith("/projects") ||
+    path.startsWith("/admin/dashboard") ||
+    path.startsWith("/admin/contacts") ||
+    path.startsWith("/admin/messages");
 
   // Define routes that require authentication (any user)
   const isAuthProtectedRoute =
@@ -61,5 +65,8 @@ export const config = {
     "/jobs/edit/:path*",
     "/post-job",
     "/post-job/:path*",
+    "/admin/dashboard/:path*",
+    "/admin/contacts/:path*",
+    "/admin/messages/:path*",
   ],
 };

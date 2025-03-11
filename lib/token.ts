@@ -13,6 +13,17 @@ export const generateVerificationToken = (email: string): string => {
   );
 };
 
+export const generatePasswordResetToken = (email: string): string => {
+  return jwt.sign(
+    {
+      email,
+      purpose: "password-reset",
+    },
+    JWT_SECRET,
+    { expiresIn: "1h" } // Password reset tokens expire in 1 hour for security
+  );
+};
+
 export const verifyToken = (
   token: string
 ): { email: string; purpose: string } => {

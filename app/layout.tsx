@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer";
 import { AuthProvider } from "@/lib/auth-context";
 import { NotificationsProvider } from "@/lib/notifications-context";
 import { Toaster } from "sonner";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -59,16 +60,18 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <AuthProvider>
-          <NotificationsProvider>
-            <Toaster position="top-right" />
-            <div className="flex min-h-screen flex-col">
-              <Navigation />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
-          </NotificationsProvider>
-        </AuthProvider>
+        <Providers>
+          <AuthProvider>
+            <NotificationsProvider>
+              <Toaster position="top-right" />
+              <div className="flex min-h-screen flex-col">
+                <Navigation />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </div>
+            </NotificationsProvider>
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

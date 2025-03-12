@@ -1,0 +1,38 @@
+[
+  {
+    "id": "cm84bdtd10000hh5kh38ctv8e",
+    "name": "contact_confirmation",
+    "subject": "We received your message - BuildXpert",
+    "content": "\n        <h2 style=\"color: #333; margin-bottom: 20px;\">Thank You for Contacting Us!</h2>\n        <p>Hello {{name}},</p>\n        <p>We have received your message regarding \"{{subject}}\". Thank you for reaching out to BuildXpert.</p>\n        <p>Our team will review your inquiry and get back to you as soon as possible, typically within 1-2 business days.</p>\n        <div style=\"background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;\">\n          <p style=\"margin: 0; font-weight: bold;\">Your request has been logged with the following details:</p>\n          <p style=\"margin: 10px 0 0 0;\">Subject: {{subject}}</p>\n          <p style=\"margin: 5px 0 0 0;\">Date: {{date}}</p>\n        </div>\n        <p>If you have any additional information to add to your inquiry, please reply to this email.</p>\n        <p>Best regards,</p>\n        <p><strong>The BuildXpert Team</strong></p>\n      ",
+    "description": "Email sent to customers after they submit a contact form",
+    "createdAt": "2025-03-11T09:54:13.861Z",
+    "updatedAt": "2025-03-11T11:29:20.902Z"
+  },
+  {
+    "id": "cm84bdtd60001hh5kseccss5r",
+    "name": "contact_notification",
+    "subject": "New Contact Form Submission: {{subject}}",
+    "content": "\n        <h2 style=\"color: #333; margin-bottom: 20px;\">New Contact Form Submission</h2>\n        <p>A new contact form has been submitted on the BuildXpert website.</p>\n        \n        <div style=\"background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;\">\n          <h3 style=\"margin-top: 0;\">Contact Details:</h3>\n          <p><strong>Name:</strong> {{name}}</p>\n          <p><strong>Email:</strong> {{email}}</p>\n          <p><strong>Phone:</strong> {{phone}}</p>\n          <p><strong>Preferred Contact Method:</strong> {{preferredContact}}</p>\n          <p><strong>Subject:</strong> {{subject}}</p>\n          <p><strong>Message:</strong></p>\n          <div style=\"background-color: white; padding: 10px; border-radius: 3px;\">\n            {{message}}\n          </div>\n          <p><strong>Date:</strong> {{date}}</p>\n        </div>\n        \n        <p>You can view and manage all contact submissions in the <a href=\"{{adminUrl}}\" style=\"color: #0070f3;\">admin dashboard</a>.</p>\n      ",
+    "description": "Email sent to admins when a new contact form is submitted",
+    "createdAt": "2025-03-11T09:54:13.866Z",
+    "updatedAt": "2025-03-11T11:29:20.905Z"
+  },
+  {
+    "id": "cm84bdtd70002hh5k4eydfyfd",
+    "name": "email_verification",
+    "subject": "Verify your BuildXpert account",
+    "content": "\n        <h2 style=\"color: #333; margin-bottom: 20px;\">Welcome to BuildXpert!</h2>\n        <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>\n        <div style=\"text-align: center; margin: 30px 0;\">\n          <a href=\"{{verificationLink}}\" \n             style=\"background-color: #0070f3; color: white; padding: 12px 24px; \n                    text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;\">\n            Verify Email Address\n          </a>\n        </div>\n        <p style=\"color: #666; font-size: 14px;\">\n          If you didn't create an account, you can safely ignore this email.\n        </p>\n        <p style=\"color: #666; font-size: 14px;\">\n          If the button doesn't work, you can also copy and paste this link into your browser:\n          <br>\n          <a href=\"{{verificationLink}}\" style=\"color: #0070f3; word-break: break-all;\">{{verificationLink}}</a>\n        </p>\n      ",
+    "description": "Email sent to users to verify their email address",
+    "createdAt": "2025-03-11T09:54:13.868Z",
+    "updatedAt": "2025-03-11T11:29:20.907Z"
+  },
+  {
+    "id": "cm84bdtd80003hh5kvkix8d8r",
+    "name": "password_reset",
+    "subject": "Reset Your BuildXpert Password",
+    "content": "\n        <h2 style=\"color: #333; margin-bottom: 20px;\">Reset Your Password</h2>\n        <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>\n        <div style=\"text-align: center; margin: 30px 0;\">\n          <a href=\"{{resetLink}}\" \n             style=\"background-color: #0070f3; color: white; padding: 12px 24px; \n                    text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;\">\n            Reset Password\n          </a>\n        </div>\n        <p style=\"color: #666; font-size: 14px;\">\n          This link will expire in 1 hour for security reasons.\n        </p>\n        <p style=\"color: #666; font-size: 14px;\">\n          If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.\n        </p>\n        <p style=\"color: #666; font-size: 14px;\">\n          If the button doesn't work, you can also copy and paste this link into your browser:\n          <br>\n          <a href=\"{{resetLink}}\" style=\"color: #0070f3; word-break: break-all;\">{{resetLink}}</a>\n        </p>\n      ",
+    "description": "Email sent to users to reset their password",
+    "createdAt": "2025-03-11T09:54:13.869Z",
+    "updatedAt": "2025-03-11T11:29:20.908Z"
+  }
+]

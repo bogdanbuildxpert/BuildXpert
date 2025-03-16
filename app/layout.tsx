@@ -8,6 +8,13 @@ import { AuthProvider } from "@/lib/auth-context";
 import { NotificationsProvider } from "@/lib/notifications-context";
 import { Toaster } from "sonner";
 import { Providers } from "./providers";
+import dynamic from "next/dynamic";
+
+// Dynamically import the InactivityMonitor with no SSR
+const InactivityMonitor = dynamic(
+  () => import("@/components/InactivityMonitor"),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -69,6 +76,7 @@ export default function RootLayout({
                 <main className="flex-1">{children}</main>
                 <Footer />
               </div>
+              <InactivityMonitor />
             </NotificationsProvider>
           </AuthProvider>
         </Providers>

@@ -226,18 +226,13 @@ export async function POST(req: Request) {
     await transporter.sendMail({
       from: {
         name: "BuildXpert Support",
-        address: process.env.EMAIL_USER || "",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to: contact.email,
       subject: responseSubject || "Response to your inquiry - BuildXpert",
       text: `Hello ${contact.name}, Thank you for contacting BuildXpert. Here is our response to your inquiry: ${responseMessage}`,
       html: emailHtml,
-      replyTo: process.env.EMAIL_USER || "",
-      headers: {
-        "X-Priority": "1",
-        Importance: "high",
-        "X-MSMail-Priority": "High",
-      },
+      replyTo: process.env.EMAIL_SERVER_USER || "",
     });
 
     // Update contact status to RESPONDED

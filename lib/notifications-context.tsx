@@ -4,6 +4,17 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAuth } from "./auth-context";
 import io from "socket.io-client";
 
+interface Sender {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+interface Job {
+  id: string;
+  title: string;
+}
+
 interface Message {
   id: string;
   content: string;
@@ -13,13 +24,19 @@ interface Message {
   jobId: string;
   createdAt: string;
   updatedAt: string;
+  sender?: Sender;
+  job?: Job;
 }
 
 interface NotificationsContextType {
   unreadCount: number;
+  notifications: Message[];
+  loading: boolean;
   resetUnreadCount: () => void;
   incrementUnreadCount: () => void;
   clearAllNotifications: () => Promise<boolean>;
+  fetchNotifications: () => Promise<void>;
+  markNotificationAsRead: (messageId: string) => Promise<boolean>;
 }
 
 const NotificationsContext = createContext<
@@ -32,6 +49,8 @@ export function NotificationsProvider({
   children: React.ReactNode;
 }) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
   // Reset unread count
@@ -42,6 +61,56 @@ export function NotificationsProvider({
   // Increment unread count
   const incrementUnreadCount = () => {
     setUnreadCount((prev) => prev + 1);
+  };
+
+  // Fetch notifications
+  const fetchNotifications = async (): Promise<void> => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/messages/notifications");
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data.notifications);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = async (
+    messageId: string
+  ): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      const response = await fetch("/api/messages/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messageId }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setNotifications((prev) =>
+          prev.filter((notification) => notification.id !== messageId)
+        );
+
+        // Decrement unread count
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      return false;
+    }
   };
 
   // Clear all notifications
@@ -59,6 +128,7 @@ export function NotificationsProvider({
 
       if (response.ok) {
         resetUnreadCount();
+        setNotifications([]);
         return true;
       }
       return false;
@@ -86,6 +156,7 @@ export function NotificationsProvider({
     };
 
     fetchUnreadCount();
+    fetchNotifications();
 
     // Set up Socket.IO connection
     const socket = io(window.location.origin, {
@@ -105,6 +176,8 @@ export function NotificationsProvider({
       // Only increment count if the current user is the receiver and not the sender
       if (message.receiverId === user.id && message.senderId !== user.id) {
         incrementUnreadCount();
+        // Add the new message to notifications
+        setNotifications((prev) => [message, ...prev]);
       }
     });
 
@@ -117,9 +190,13 @@ export function NotificationsProvider({
     <NotificationsContext.Provider
       value={{
         unreadCount,
+        notifications,
+        loading,
         resetUnreadCount,
         incrementUnreadCount,
         clearAllNotifications,
+        fetchNotifications,
+        markNotificationAsRead,
       }}
     >
       {children}

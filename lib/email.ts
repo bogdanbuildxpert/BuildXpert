@@ -100,12 +100,12 @@ export const sendVerificationEmail = async (to: string, token: string) => {
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject,
-      text: `Welcome to BuildXpert! Please verify your email by visiting: ${verificationLink}`,
+      text: `Welcome to BuildXpert! Please verify your email by clicking this link: ${verificationLink}`,
       html: createEmailLayout(content),
     };
 
@@ -113,6 +113,7 @@ export const sendVerificationEmail = async (to: string, token: string) => {
   } catch (error) {
     console.error("Error sending verification email:", error);
     // Fallback to hardcoded template if database template fails
+    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${token}`;
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
       <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
@@ -135,12 +136,12 @@ export const sendVerificationEmail = async (to: string, token: string) => {
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject: "Verify your BuildXpert account",
-      text: `Welcome to BuildXpert! Please verify your email by visiting: ${verificationLink}`,
+      text: `Welcome to BuildXpert! Please verify your email by clicking this link: ${verificationLink}`,
       html: createEmailLayout(content),
     };
 
@@ -150,29 +151,29 @@ export const sendVerificationEmail = async (to: string, token: string) => {
 
 export const sendContactConfirmationEmail = async (
   to: string,
-  name: string,
+  firstName: string,
   subject: string
 ) => {
   try {
     const { subject: emailSubject, content } = await getProcessedTemplate(
       "contact_confirmation",
       {
-        name,
+        name: firstName,
         subject,
-        date: new Date().toLocaleDateString(),
+        date: new Date().toLocaleString(),
       }
     );
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Customer Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject: emailSubject,
       text: `Thank you for contacting BuildXpert! We have received your message regarding "${subject}" and will respond within 1-2 business days.`,
       html: createEmailLayout(content),
-      replyTo: process.env.EMAIL_USER || "",
+      replyTo: process.env.EMAIL_SERVER_USER || "",
     };
 
     await transporter.sendMail(mailOptions);
@@ -181,13 +182,13 @@ export const sendContactConfirmationEmail = async (
     // Fallback to hardcoded template if database template fails
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">Thank You for Contacting Us!</h2>
-      <p>Hello ${name},</p>
+      <p>Hello ${firstName},</p>
       <p>We have received your message regarding "${subject}". Thank you for reaching out to BuildXpert.</p>
       <p>Our team will review your inquiry and get back to you as soon as possible, typically within 1-2 business days.</p>
       <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <p style="margin: 0; font-weight: bold;">Your request has been logged with the following details:</p>
         <p style="margin: 10px 0 0 0;">Subject: ${subject}</p>
-        <p style="margin: 5px 0 0 0;">Date: ${new Date().toLocaleDateString()}</p>
+        <p style="margin: 5px 0 0 0;">Date: ${new Date().toLocaleString()}</p>
       </div>
       <p>If you have any additional information to add to your inquiry, please reply to this email.</p>
       <p>Best regards,</p>
@@ -196,14 +197,14 @@ export const sendContactConfirmationEmail = async (
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Customer Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject: "We received your message - BuildXpert",
       text: `Thank you for contacting BuildXpert! We have received your message regarding "${subject}" and will respond within 1-2 business days.`,
       html: createEmailLayout(content),
-      replyTo: process.env.EMAIL_USER || "",
+      replyTo: process.env.EMAIL_SERVER_USER || "",
     };
 
     await transporter.sendMail(mailOptions);
@@ -240,9 +241,9 @@ export const sendContactNotificationEmail = async (contactData: {
     const mailOptions = {
       from: {
         name: "BuildXpert Notifications",
-        address: process.env.EMAIL_USER || "",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
-      to: process.env.EMAIL_USER || "",
+      to: process.env.ADMIN_EMAIL || "bogdan@buildxpert.ie",
       subject: emailSubject,
       text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
       html: createEmailLayout(content),
@@ -280,9 +281,9 @@ export const sendContactNotificationEmail = async (contactData: {
     const mailOptions = {
       from: {
         name: "BuildXpert Notifications",
-        address: process.env.EMAIL_USER || "",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
-      to: process.env.EMAIL_USER || "",
+      to: process.env.ADMIN_EMAIL || "bogdan@buildxpert.ie",
       subject: `New Contact Form Submission: ${subject}`,
       text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
       html: createEmailLayout(content),
@@ -303,12 +304,12 @@ export const sendPasswordResetEmail = async (to: string, token: string) => {
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject,
-      text: `Reset your BuildXpert password by visiting: ${resetLink}. This link will expire in 1 hour.`,
+      text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
       html: createEmailLayout(content),
     };
 
@@ -341,12 +342,12 @@ export const sendPasswordResetEmail = async (to: string, token: string) => {
 
     const mailOptions = {
       from: {
-        name: "BuildXpert Support",
-        address: process.env.EMAIL_USER || "",
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
+        address: process.env.EMAIL_SERVER_USER || "",
       },
       to,
       subject: "Reset Your BuildXpert Password",
-      text: `Reset your BuildXpert password by visiting: ${resetLink}. This link will expire in 1 hour.`,
+      text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
       html: createEmailLayout(content),
     };
 

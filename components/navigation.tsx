@@ -106,46 +106,48 @@ export function Navigation() {
             <div className="flex items-center space-x-4">
               {user ? (
                 <>
-                  {unreadCount > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <div className="relative cursor-pointer">
-                          <Bell
-                            size={20}
-                            className="text-primary hover:text-primary/80"
-                          />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="relative cursor-pointer">
+                        <Bell
+                          size={20}
+                          className="text-primary hover:text-primary/80"
+                        />
+                        {unreadCount > 0 && (
                           <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
-                        </div>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link href="/messages" className="flex items-center">
-                            View all messages
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={handleDeleteAllNotifications}
-                          disabled={isDeletingNotifications}
-                          className="text-red-500 cursor-pointer"
-                        >
-                          {isDeletingNotifications ? (
-                            <>
-                              <span className="mr-2">Clearing...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 size={16} className="mr-2" />
-                              Clear all notifications
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                        )}
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/messages" className="flex items-center">
+                          View all messages
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleDeleteAllNotifications}
+                        disabled={isDeletingNotifications || unreadCount === 0}
+                        className={`cursor-pointer ${
+                          unreadCount > 0 ? "text-red-500" : "text-gray-400"
+                        }`}
+                      >
+                        {isDeletingNotifications ? (
+                          <>
+                            <span className="mr-2">Clearing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 size={16} className="mr-2" />
+                            Clear all notifications
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -163,19 +165,19 @@ export function Navigation() {
                       <DropdownMenuItem asChild>
                         <Link href="/profile">Profile</Link>
                       </DropdownMenuItem>
-                      {unreadCount > 0 && (
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href="/messages"
-                            className="flex items-center justify-between w-full"
-                          >
-                            <span>Messages</span>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/messages"
+                          className="flex items-center justify-between w-full"
+                        >
+                          <span>Messages</span>
+                          {unreadCount > 0 && (
                             <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                               {unreadCount > 9 ? "9+" : unreadCount}
                             </span>
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
+                          )}
+                        </Link>
+                      </DropdownMenuItem>
                       {isAdmin && (
                         <DropdownMenuItem asChild>
                           <Link href="/admin/dashboard">Admin Dashboard</Link>
@@ -267,6 +269,19 @@ export function Navigation() {
                   >
                     <User size={16} className="mr-2" />
                     My Profile
+                  </Link>
+                  <Link
+                    href="/messages"
+                    className="flex items-center py-2 text-sm"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Bell size={16} className="mr-2" />
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
                   </Link>
                   {isAdmin && (
                     <Link

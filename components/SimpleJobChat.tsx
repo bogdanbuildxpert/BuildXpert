@@ -161,93 +161,82 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     }
   };
 
-  // Fetch messages when component mounts and when the job or user changes
+  // Set up socket.io for real-time messaging
   useEffect(() => {
-    if (!user) return;
+    if (!user || !jobId) return;
 
-    // Initialize Socket.IO connection
-    const socket = io(window.location.origin, {
-      path: "/socket.io",
-      transports: ["polling"],
-      forceNew: true,
-      timeout: 20000,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
+    let refreshInterval: NodeJS.Timeout | null = null;
+    let socket: any = null;
 
-    socketRef.current = socket;
+    try {
+      // Set up Socket.IO connection
+      socket = io(window.location.origin, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        forceNew: true,
+        reconnectionAttempts: 3,
+        timeout: 20000,
+      });
 
-    // Connect to Socket.IO server
-    socket.on("connect", () => {
-      console.log("Socket connected with ID:", socket.id);
-      socket.emit("join", user.id);
-      setSocketConnected(true);
-    });
+      socket.on("connect", () => {
+        console.log("SimpleJobChat socket connected");
 
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected");
-      setSocketConnected(false);
-    });
+        // Join user-specific room
+        socket.emit("join", user.id);
 
-    socket.on("reconnect", (attemptNumber: number) => {
-      console.log(`Socket reconnected after ${attemptNumber} attempts`);
-      setSocketConnected(true);
-      // Re-join the room after reconnection
-      socket.emit("join", user.id);
-    });
-
-    socket.on("reconnect_attempt", (attemptNumber: number) => {
-      console.log(`Socket reconnection attempt #${attemptNumber}`);
-    });
-
-    socket.on("reconnect_error", (error: Error) => {
-      console.error("Socket reconnection error:", error);
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("Socket failed to reconnect after all attempts");
-      toast.error("Failed to connect to chat server. Please refresh the page.");
-    });
-
-    socket.on("connect_error", (error: Error) => {
-      console.error("Socket connection error:", error);
-      setSocketConnected(false);
-      toast.error("Failed to connect to chat server");
-    });
-
-    // Listen for new messages
-    socket.on("new_message", (message: Message) => {
-      console.log("Received new message via socket:", message);
-      // Only add the message if it's related to this job and hasn't been processed yet
-      if (
-        message.jobId === jobId &&
-        !processedMessageIds.current.has(message.id)
-      ) {
-        processedMessageIds.current.add(message.id);
-        setMessages((prevMessages) => [...prevMessages, message]);
-        // Don't auto-scroll on receiving messages
-
-        // Mark the message as read if the current user is the receiver
-        if (message.receiverId === user.id) {
-          fetch(`/api/messages/${message.id}/read`, {
-            method: "PUT",
-          });
+        // Clear polling interval if it exists
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
         }
-      }
-    });
+      });
 
-    // Fetch messages when component mounts
-    fetchMessages();
+      socket.on("connect_error", (error: any) => {
+        console.warn("Socket.IO connection error:", error.message);
+        // Set up polling as fallback
+        if (!refreshInterval) {
+          console.log("Setting up polling fallback for chat messages");
+          refreshInterval = setInterval(() => {
+            fetchMessages();
+          }, 10000); // Poll every 10 seconds
+        }
+      });
 
-    // Scroll to bottom when component mounts
-    scrollToBottom();
+      // Listen for new messages
+      socket.on("new_message", (message: Message) => {
+        if (message.jobId === jobId) {
+          setMessages((prev) => {
+            // Skip if we already have this message
+            if (prev.some((m) => m.id === message.id)) {
+              return prev;
+            }
+            return [...prev, message];
+          });
 
-    // Clean up function
+          // Scroll to the bottom when receiving new messages
+          scrollToBottom();
+        }
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to initialize Socket.IO, falling back to polling",
+        error
+      );
+      // Set up polling as fallback
+      refreshInterval = setInterval(() => {
+        fetchMessages();
+      }, 10000); // Poll every 10 seconds
+    }
+
     return () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
     };
-  }, [user, jobId, fetchMessages, scrollToBottom, messages.length]);
+  }, [user, jobId, messages]);
 
   // Handle sending a message
   const handleSendMessage = async (e: React.FormEvent) => {

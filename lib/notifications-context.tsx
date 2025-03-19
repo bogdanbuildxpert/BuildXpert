@@ -158,31 +158,72 @@ export function NotificationsProvider({
     fetchUnreadCount();
     fetchNotifications();
 
-    // Set up Socket.IO connection
-    const socket = io(window.location.origin, {
-      path: "/socket.io",
-      transports: ["polling"],
-      forceNew: true,
-      timeout: 20000,
-    });
+    // Polling fallback for when Socket.IO isn't available
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let socket: any = null;
 
-    // Listen for new messages
-    socket.on("connect", () => {
-      console.log("Notifications socket connected");
-      socket.emit("join", user.id);
-    });
+    try {
+      // Set up Socket.IO connection
+      socket = io(window.location.origin, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        forceNew: true,
+        timeout: 20000,
+        reconnectionAttempts: 3,
+        autoConnect: true,
+      });
 
-    socket.on("new_message", (message: Message) => {
-      // Only increment count if the current user is the receiver and not the sender
-      if (message.receiverId === user.id && message.senderId !== user.id) {
-        incrementUnreadCount();
-        // Add the new message to notifications
-        setNotifications((prev) => [message, ...prev]);
-      }
-    });
+      // Listen for new messages
+      socket.on("connect", () => {
+        console.log("Notifications socket connected");
+        socket.emit("join", user.id);
+        // Clear polling if we successfully connect
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          pollingInterval = null;
+        }
+      });
+
+      socket.on("connect_error", (error: any) => {
+        console.warn("Socket.IO connection error:", error.message);
+        // Set up polling as fallback if socket connection fails
+        if (!pollingInterval) {
+          console.log("Setting up polling fallback for notifications");
+          pollingInterval = setInterval(() => {
+            fetchUnreadCount();
+            fetchNotifications();
+          }, 15000); // Poll every 15 seconds
+        }
+      });
+
+      socket.on("new_message", (message: Message) => {
+        // Only increment count if the current user is the receiver and not the sender
+        if (message.receiverId === user.id && message.senderId !== user.id) {
+          incrementUnreadCount();
+          // Add the new message to notifications
+          setNotifications((prev) => [message, ...prev]);
+        }
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to initialize Socket.IO, falling back to polling",
+        error
+      );
+      // Set up polling as fallback
+      pollingInterval = setInterval(() => {
+        fetchUnreadCount();
+        fetchNotifications();
+      }, 15000); // Poll every 15 seconds
+    }
 
     return () => {
-      socket.disconnect();
+      // Clean up
+      if (socket) {
+        socket.disconnect();
+      }
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
     };
   }, [user, fetchNotifications]);
 

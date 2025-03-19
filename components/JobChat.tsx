@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import io, { Socket } from "socket.io-client";
+import io from "socket.io-client";
 
 interface Message {
   id: string;
@@ -123,115 +123,144 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     }
   }, [isLoading]);
 
-  // Set up Socket.IO connection and fetch initial messages
+  // Set up Socket.IO connection for real-time messages
   useEffect(() => {
-    if (!user) return;
+    if (!user || !jobId) return;
 
-    // Initial fetch
-    fetchMessages();
+    let refreshInterval: NodeJS.Timeout | null = null;
+    let socket: any = null;
 
-    // Set up Socket.IO connection with explicit URL and options
-    const socket = io(window.location.origin, {
-      path: "/socket.io",
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      // Use only polling to avoid WebSocket issues
-      transports: ["polling"],
-      forceNew: true,
-      timeout: 20000,
-    });
+    try {
+      // First fetch existing messages
+      fetchMessages();
 
-    socketRef.current = socket;
+      // Set up socket connection
+      socket = io(window.location.origin, {
+        path: "/socket.io",
+        transports: ["polling", "websocket"],
+        forceNew: true,
+        reconnectionAttempts: 3,
+        timeout: 20000,
+      });
 
-    // Log connection status
-    socket.on("connect", () => {
-      console.log("Socket.IO connected with ID:", socket.id);
-      setSocketConnected(true);
+      socket.on("connect", () => {
+        console.log("Socket.IO connected");
+        setSocketConnected(true);
 
-      // Join user-specific room
-      socket.emit("join", user.id);
-    });
+        // Join user-specific room
+        socket.emit("join", user.id);
 
-    socket.on("disconnect", () => {
-      console.log("Socket.IO disconnected");
-      setSocketConnected(false);
-    });
-
-    socket.on("reconnect", (attemptNumber: number) => {
-      console.log(`Socket reconnected after ${attemptNumber} attempts`);
-      setSocketConnected(true);
-      // Re-join the room after reconnection
-      socket.emit("join", user.id);
-    });
-
-    socket.on("reconnect_attempt", (attemptNumber: number) => {
-      console.log(`Socket reconnection attempt #${attemptNumber}`);
-    });
-
-    socket.on("reconnect_error", (error: Error) => {
-      console.error("Socket reconnection error:", error);
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("Socket failed to reconnect after all attempts");
-      toast.error("Failed to connect to chat server. Please refresh the page.");
-    });
-
-    socket.on("connect_error", (error: Error) => {
-      console.error("Socket.IO connection error:", error);
-      setSocketConnected(false);
-    });
-
-    // Listen for new messages
-    socket.on("new_message", (message: Message) => {
-      console.log("Received new message via socket:", message);
-      if (message.jobId === jobId) {
-        // Add message if it's not already in the list
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === message.id)) {
-            return prev;
-          }
-          return [...prev, message];
-        });
-
-        // Mark message as read if user is the receiver
-        if (message.receiverId === user.id) {
-          // First update the API
-          fetch(`/api/messages/read?jobId=${jobId}&userId=${user.id}`, {
-            method: "POST",
-          })
-            .then(() => {
-              // Then emit the socket event to notify the sender
-              socket.emit("mark_read", {
-                jobId,
-                readBy: user.id,
-                senderId: message.senderId,
-              });
-            })
-            .catch((err) =>
-              console.error("Error marking messages as read:", err)
-            );
+        // Clear any polling interval if it exists
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
         }
-      }
-    });
+      });
 
-    // Listen for messages being marked as read
-    socket.on("messages_read", (data: { jobId: string; readBy: string }) => {
-      if (data.jobId === jobId) {
-        // Update read status for messages sent by current user
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.senderId === user.id && msg.receiverId === data.readBy
-              ? { ...msg, isRead: true }
-              : msg
-          )
+      socket.on("disconnect", () => {
+        console.log("Socket.IO disconnected");
+        setSocketConnected(false);
+      });
+
+      socket.on("connect_error", (error: Error) => {
+        console.error("Socket.IO connection error:", error);
+        setSocketConnected(false);
+
+        // Set up polling as fallback
+        if (!refreshInterval) {
+          console.log("Setting up polling fallback for messages");
+          refreshInterval = setInterval(() => {
+            fetchMessages();
+          }, 10000); // Poll every 10 seconds
+        }
+      });
+
+      socket.on("reconnect", (attemptNumber: number) => {
+        console.log(`Socket reconnected after ${attemptNumber} attempts`);
+        setSocketConnected(true);
+        // Re-join the room after reconnection
+        socket.emit("join", user.id);
+      });
+
+      socket.on("reconnect_attempt", (attemptNumber: number) => {
+        console.log(`Socket reconnection attempt #${attemptNumber}`);
+      });
+
+      socket.on("reconnect_error", (error: Error) => {
+        console.error("Socket reconnection error:", error);
+      });
+
+      socket.on("reconnect_failed", () => {
+        console.error("Socket failed to reconnect after all attempts");
+        toast.error(
+          "Failed to connect to chat server. Please refresh the page."
         );
-      }
-    });
+      });
+
+      // Listen for new messages
+      socket.on("new_message", (message: Message) => {
+        console.log("Received new message via socket:", message);
+        if (message.jobId === jobId) {
+          // Add message if it's not already in the list
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === message.id)) {
+              return prev;
+            }
+            return [...prev, message];
+          });
+
+          // Mark message as read if user is the receiver
+          if (message.receiverId === user.id) {
+            // First update the API
+            fetch(`/api/messages/read?jobId=${jobId}&userId=${user.id}`, {
+              method: "POST",
+            })
+              .then(() => {
+                // Then emit the socket event to notify the sender
+                socket.emit("mark_read", {
+                  jobId,
+                  readBy: user.id,
+                  senderId: message.senderId,
+                });
+              })
+              .catch((err) =>
+                console.error("Error marking messages as read:", err)
+              );
+          }
+        }
+      });
+
+      // Listen for messages being marked as read
+      socket.on("messages_read", (data: { jobId: string; readBy: string }) => {
+        if (data.jobId === jobId) {
+          // Update read status for messages sent by current user
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.senderId === user.id && msg.receiverId === data.readBy
+                ? { ...msg, isRead: true }
+                : msg
+            )
+          );
+        }
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to initialize Socket.IO, falling back to polling",
+        error
+      );
+      // Set up polling as fallback
+      refreshInterval = setInterval(() => {
+        fetchMessages();
+      }, 10000); // Poll every 10 seconds
+    }
 
     return () => {
-      socket.disconnect();
+      if (socket) {
+        socket.disconnect();
+      }
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
     };
   }, [user, jobId, fetchMessages]);
 

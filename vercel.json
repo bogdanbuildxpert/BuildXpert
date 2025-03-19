@@ -1,15 +1,8 @@
 {
+  "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "framework": "nextjs",
   "outputDirectory": ".next",
-  "regions": ["iad1"],
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node"
-    }
-  ],
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "false"

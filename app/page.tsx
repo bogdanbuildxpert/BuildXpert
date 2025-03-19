@@ -55,11 +55,11 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 md:py-24">
+      <section className="py-16 md:py-24 bg-muted">
         <div className="container">
           <h2 className="text-3xl font-bold text-center mb-12">Our Services</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in">
+            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in bg-card">
               <div className="bg-secondary p-4 rounded-full mb-4">
                 <Brush className="h-6 w-6" />
               </div>
@@ -69,7 +69,7 @@ export default function Home() {
                 projects with meticulous attention to detail.
               </p>
             </div>
-            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in">
+            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in bg-card">
               <div className="bg-secondary p-4 rounded-full mb-4">
                 <Calendar className="h-6 w-6" />
               </div>
@@ -79,7 +79,7 @@ export default function Home() {
                 our interactive scheduling system.
               </p>
             </div>
-            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in">
+            <div className="flex flex-col items-center text-center p-6 border border-border rounded-lg fade-in bg-card">
               <div className="bg-secondary p-4 rounded-full mb-4">
                 <MessageSquare className="h-6 w-6" />
               </div>
@@ -93,8 +93,74 @@ export default function Home() {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section className="py-16 md:py-24">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">How It Works</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Getting a quote and booking your painting job is simple and
+              straightforward with BuildXpert.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-card rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow fade-in">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-center">
+                  <div className="bg-primary text-primary-foreground w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
+                    1
+                  </div>
+                </div>
+                <h3 className="text-xl font-medium text-center">
+                  Post Your Job
+                </h3>
+                <p className="text-muted-foreground text-center">
+                  Fill out our simple job posting form with details about your
+                  painting project.
+                </p>
+              </div>
+            </div>
+            <div className="bg-card rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow fade-in">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-center">
+                  <div className="bg-primary text-primary-foreground w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
+                    2
+                  </div>
+                </div>
+                <h3 className="text-xl font-medium text-center">Get a Quote</h3>
+                <p className="text-muted-foreground text-center">
+                  Our team of professional painters will assess your job and
+                  provide detailed quotes quickly, ensuring top-quality service.
+                </p>
+              </div>
+            </div>
+            <div className="bg-card rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow fade-in">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-center">
+                  <div className="bg-primary text-primary-foreground w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold">
+                    3
+                  </div>
+                </div>
+                <h3 className="text-xl font-medium text-center">
+                  Schedule Your Service
+                </h3>
+                <p className="text-muted-foreground text-center">
+                  Choose the best quote, communicate with your painter, and
+                  schedule your project.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-12 text-center">
+            <Button size="lg" asChild>
+              <Link href="/post-job">Get Started Now</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Painting Jobs Showcase Section */}
-      <section className="py-16 md:py-24 bg-secondary">
+      <section className="py-16 md:py-24 bg-muted">
         <div className="container">
           <div className="flex justify-between items-center mb-12">
             <h2 className="text-3xl font-bold">Our Recent Projects</h2>

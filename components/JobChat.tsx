@@ -46,6 +46,7 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
   const socketRef = useRef<any>(null);
 
@@ -115,6 +116,14 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Only scroll to bottom on initial load, not when messages change
+  useEffect(() => {
+    // Only scroll on initial load
+    if (isLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  }, [isLoading]);
 
   // Set up Socket.IO connection and fetch initial messages
   useEffect(() => {
@@ -272,6 +281,11 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       // Clear the input field after sending
       setNewMessage("");
 
+      // Refocus the textarea after sending
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+
       // Add the message to the local state immediately for better UX
       setMessages((prev) => [...prev, newMessageData]);
 
@@ -306,6 +320,19 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       day: "numeric",
       month: "short",
     }).format(date);
+  };
+
+  // Handle key press in the textarea
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Send message on Enter without Shift key
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e as unknown as React.FormEvent);
+      // Refocus the textarea after sending
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+    }
   };
 
   if (!canViewChat) {
@@ -408,7 +435,9 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
             placeholder="Type your message..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={handleKeyPress}
             className="min-h-[80px] resize-none"
+            ref={textareaRef}
           />
           <Button
             type="submit"

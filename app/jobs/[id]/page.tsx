@@ -4,18 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Loader2, X } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Loader2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { SimpleJobChat } from "@/components/SimpleJobChat";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Job {
   id: string;
   title: string;
   description: string;
   location: string;
-  salary: number | null;
-  type: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -23,6 +28,7 @@ interface Job {
     id: string;
     name: string | null;
     email: string;
+    role: string;
   };
   metadata?: {
     propertyType?: string;
@@ -43,10 +49,18 @@ interface Job {
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Redirect to login if user is not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push(`/login?redirect=/jobs/${params.id}`);
+    }
+  }, [user, authLoading, router, params.id]);
 
   // Fetch job data
   const fetchJob = useCallback(async () => {
@@ -93,6 +107,43 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       day: "numeric",
     }).format(date);
   };
+
+  // Add function to update job status
+  const updateJobStatus = async (newStatus: string) => {
+    if (!job || !user || user.role !== "ADMIN") return;
+
+    try {
+      setIsUpdatingStatus(true);
+      const response = await fetch(`/api/jobs/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...job,
+          status: newStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update job status");
+      }
+
+      // Update local state
+      setJob((prev) => (prev ? { ...prev, status: newStatus } : null));
+      toast.success("Job status updated successfully");
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      toast.error("Failed to update job status");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Don't render anything if user is not authenticated (prevents flash of content before redirect)
+  if (!user) {
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -152,52 +203,87 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <h1 className="text-3xl font-bold">{job.title}</h1>
-                  <span
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${
-                      job.status === "OPEN"
-                        ? "bg-green-100 text-green-800"
-                        : job.status === "FILLED"
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {job.status === "OPEN"
-                      ? "Open"
-                      : job.status === "FILLED"
-                      ? "Filled"
-                      : "Closed"}
-                  </span>
+                  {isAdmin ? (
+                    <div className="relative">
+                      <Select
+                        value={job.status}
+                        onValueChange={updateJobStatus}
+                        disabled={isUpdatingStatus}
+                      >
+                        <SelectTrigger
+                          className={`h-7 px-3 text-xs font-medium rounded-full border-0 ${
+                            job.status === "PLANNING"
+                              ? "bg-green-100 text-green-800 hover:bg-green-200"
+                              : job.status === "IN_PROGRESS"
+                              ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                              : job.status === "ON_HOLD"
+                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                              : job.status === "COMPLETED"
+                              ? "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                              : "bg-red-100 text-red-800 hover:bg-red-200"
+                          }`}
+                        >
+                          <SelectValue>
+                            {isUpdatingStatus ? (
+                              <div className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Updating...
+                              </div>
+                            ) : job.status === "PLANNING" ? (
+                              "Planning"
+                            ) : job.status === "IN_PROGRESS" ? (
+                              "In Progress"
+                            ) : job.status === "ON_HOLD" ? (
+                              "On Hold"
+                            ) : job.status === "COMPLETED" ? (
+                              "Completed"
+                            ) : (
+                              "Cancelled"
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PLANNING">Planning</SelectItem>
+                          <SelectItem value="IN_PROGRESS">
+                            In Progress
+                          </SelectItem>
+                          <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                          <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <span
+                      className={`text-xs font-medium px-3 py-1 rounded-full ${
+                        job.status === "PLANNING"
+                          ? "bg-green-100 text-green-800"
+                          : job.status === "IN_PROGRESS"
+                          ? "bg-blue-100 text-blue-800"
+                          : job.status === "ON_HOLD"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : job.status === "COMPLETED"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {job.status === "PLANNING"
+                        ? "Planning"
+                        : job.status === "IN_PROGRESS"
+                        ? "In Progress"
+                        : job.status === "ON_HOLD"
+                        ? "On Hold"
+                        : job.status === "COMPLETED"
+                        ? "Completed"
+                        : "Cancelled"}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-6">
                   <div className="flex items-center gap-1.5">
                     <MapPin className="h-4 w-4 text-primary" />
                     <span>{job.location}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    <span>Type: {job.type.replace("_", " ")}</span>
-                  </div>
-                  {job.salary && (
-                    <div className="flex items-center gap-1.5">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4 text-primary"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
-                        <path d="M12 18V6" />
-                      </svg>
-                      <span>Salary: ${job.salary}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -382,29 +468,37 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
 
             {/* Chat Component */}
-            {user && job.status === "OPEN" && (
-              <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
-                <div className="border-b px-6 py-4">
-                  <h2 className="text-xl font-semibold">Contact Client</h2>
+            {user &&
+              job.status === "PLANNING" &&
+              // Don't show chat if job is posted by an admin
+              (!job.poster.role ||
+                (job.poster.role !== "ADMIN" &&
+                  job.poster.role !== "admin")) && (
+                <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
+                  <div className="border-b px-6 py-4">
+                    <h2 className="text-xl font-semibold">Chat with us</h2>
+                  </div>
+                  <div className="p-6">
+                    {isJobPoster || isAdmin ? (
+                      <SimpleJobChat
+                        jobId={job.id}
+                        jobPosterId={job.poster.id}
+                      />
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Interested in this job? Contact the client directly.
+                        </p>
+                        <Button className="w-full" asChild>
+                          <Link href={`/messages?jobId=${job.id}`}>
+                            Send Message
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="p-6">
-                  {isJobPoster || isAdmin ? (
-                    <SimpleJobChat jobId={job.id} jobPosterId={job.poster.id} />
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Interested in this job? Contact the client directly.
-                      </p>
-                      <Button className="w-full" asChild>
-                        <Link href={`/messages?jobId=${job.id}`}>
-                          Send Message
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
           </div>
         </div>
       </div>

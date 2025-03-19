@@ -31,9 +31,7 @@ async function addMockJobs() {
         description:
           "We are looking for an experienced Construction Manager to oversee large-scale commercial building projects. The ideal candidate has 7+ years of experience managing complex construction projects and a strong understanding of building codes and regulations.",
         location: "New York, NY",
-        salary: 120000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -41,9 +39,7 @@ async function addMockJobs() {
         description:
           "Seeking a licensed electrician for residential projects. Responsibilities include installing, maintaining, and repairing electrical systems in homes. Must have 3+ years of experience and valid electrician license.",
         location: "Chicago, IL",
-        salary: 75000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -51,9 +47,7 @@ async function addMockJobs() {
         description:
           "Looking for a skilled carpenter to join our team on a part-time basis. Projects include custom cabinetry, furniture repair, and finish carpentry. Flexible hours, perfect for experienced carpenters seeking supplemental income.",
         location: "Austin, TX",
-        salary: 40000,
-        type: "PART_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -61,9 +55,7 @@ async function addMockJobs() {
         description:
           "Contract position for HVAC installation and maintenance on a new office building project. 6-month contract with possibility of extension. EPA certification required.",
         location: "Denver, CO",
-        salary: 85000,
-        type: "CONTRACT",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -71,9 +63,7 @@ async function addMockJobs() {
         description:
           "Temporary position for a certified Safety Officer to oversee safety protocols on a large construction site. OSHA certification required. Position duration is approximately 3 months.",
         location: "Seattle, WA",
-        salary: 65000,
-        type: "TEMPORARY",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -81,9 +71,7 @@ async function addMockJobs() {
         description:
           "Seeking an experienced Project Manager to oversee the renovation of a 50,000 sq ft commercial space. Responsibilities include budget management, scheduling, and coordinating with subcontractors. PMP certification preferred.",
         location: "Miami, FL",
-        salary: 110000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -91,9 +79,7 @@ async function addMockJobs() {
         description:
           "Great opportunity for someone looking to start a career in plumbing. Will work alongside experienced plumbers on residential and light commercial projects. No experience necessary, but must have high school diploma or GED.",
         location: "Portland, OR",
-        salary: 45000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
       {
@@ -101,9 +87,7 @@ async function addMockJobs() {
         description:
           "Seeking a creative Interior Designer to work with clients on home renovation projects. Must have a portfolio demonstrating residential design experience and knowledge of current design trends.",
         location: "Los Angeles, CA",
-        salary: 80000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: adminUser.id,
       },
     ];
@@ -121,7 +105,7 @@ async function addMockJobs() {
       `Successfully added ${createdJobs.length} mock jobs to the database:`
     );
     createdJobs.forEach((job, index) => {
-      console.log(`${index + 1}. ${job.title} (${job.type}) - ${job.location}`);
+      console.log(`${index + 1}. ${job.title} - ${job.location}`);
     });
   } catch (error) {
     console.error("Error adding mock jobs:", error);

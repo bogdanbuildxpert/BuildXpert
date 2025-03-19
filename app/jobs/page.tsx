@@ -5,9 +5,18 @@ import { useAuth } from "@/lib/auth-context";
 import { AdminJobList } from "@/components/AdminJobList";
 import { ClientJobList } from "@/components/ClientJobList";
 import { Briefcase } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function JobsPage() {
   const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirect to login if user is not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login?redirect=/jobs");
+    }
+  }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -23,23 +32,26 @@ export default function JobsPage() {
     );
   }
 
+  // Don't render anything if user is not authenticated (prevents flash of content before redirect)
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="container py-16 md:py-24">
       <div className="space-y-12 fade-in">
         <div className="space-y-4">
           <h1 className="text-3xl md:text-4xl font-bold">
-            {user && user.role !== "ADMIN"
-              ? "Manage Your Jobs"
-              : "Available Jobs"}
+            {user.role !== "ADMIN" ? "Manage Your Jobs" : "Available Jobs"}
           </h1>
           <p className="text-muted-foreground max-w-3xl">
-            {user && user.role !== "ADMIN"
+            {user.role !== "ADMIN"
               ? "Create, edit, and manage your job postings to find qualified professionals for your projects."
               : "Browse through our current job listings or post your own job to find professional services for your construction project."}
           </p>
         </div>
 
-        {user && user.role === "ADMIN" ? (
+        {user.role === "ADMIN" ? (
           // Admin view - can see all jobs
           <AdminJobList />
         ) : (
@@ -49,7 +61,7 @@ export default function JobsPage() {
               <Briefcase className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-semibold">My Jobs</h2>
             </div>
-            {user ? <ClientJobList userId={user.id} /> : null}
+            <ClientJobList userId={user.id} />
           </div>
         )}
       </div>

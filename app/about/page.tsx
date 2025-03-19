@@ -39,11 +39,12 @@ export default function AboutPage() {
               in our work and strive to exceed our clients' expectations.
             </p>
           </div>
-          <div className="relative aspect-[4/3]">
+          <div className="relative flex justify-center">
             <img
-              src="/placeholder.svg?height=600&width=800"
-              alt="Our team at work"
-              className="w-full h-full object-cover rounded-lg"
+              src="/images/AppImages/ContactUs.webp"
+              alt="Our team at BuildXpert"
+              className="rounded-lg shadow-md"
+              style={{ maxHeight: "450px", maxWidth: "100%" }}
             />
           </div>
         </div>

@@ -35,6 +35,36 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+interface Job {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  poster: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+  metadata?: {
+    propertyType?: string;
+    paintingAreas?: string[];
+    surfaceCondition?: string;
+    paintType?: string;
+    colorPreferences?: string;
+    specialFinishes?: string;
+    estimatedArea?: number;
+    startDate?: string;
+    endDate?: string;
+    furnitureMoving?: boolean;
+    scaffolding?: boolean;
+    additionalNotes?: string;
+    images?: string[];
+  };
+}
+
 export default function PostJobPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
@@ -86,20 +116,73 @@ export default function PostJobPage() {
     estimatedArea: "project-scope",
   };
 
-  // Redirect if not authenticated
+  // Add this array of accordion sections in order
+  const accordionSections = [
+    "client-info",
+    "job-details",
+    "painting-preferences",
+    "project-scope",
+    "additional-requirements",
+    "attachments",
+    "additional-notes",
+  ];
+
+  // Add progress tracking
+  const [completedSections, setCompletedSections] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Add function to check section completion
+  const isSectionComplete = (section: string) => {
+    switch (section) {
+      case "client-info":
+        return formData.email && formData.phone;
+      case "job-details":
+        return formData.jobLocation && formData.paintingAreas.length > 0;
+      case "painting-preferences":
+        return formData.colorPreferences || formData.specialFinishes;
+      case "project-scope":
+        return formData.estimatedArea;
+      default:
+        return true;
+    }
+  };
+
+  // Update handleNextSection to include completion tracking
+  const handleNextSection = () => {
+    const currentIndex = accordionSections.indexOf(activeAccordion);
+    if (currentIndex < accordionSections.length - 1) {
+      // Mark current section as complete if it passes validation
+      if (isSectionComplete(activeAccordion)) {
+        setCompletedSections((prev) => new Set([...prev, activeAccordion]));
+      }
+      setActiveAccordion(accordionSections[currentIndex + 1]);
+    }
+  };
+
+  // Add keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && e.ctrlKey && !isLastSection()) {
+        handleNextSection();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [activeAccordion]);
+
+  // Redirect to login if user is not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/login?from=/post-job");
+      router.push("/login?redirect=/post-job");
     }
+  }, [user, authLoading, router]);
 
-    // Pre-fill email if user is logged in
-    if (user && user.email && !formData.email) {
-      setFormData((prev) => ({
-        ...prev,
-        email: user.email,
-      }));
-    }
-  }, [user, authLoading, router, formData.email]);
+  // Don't render anything if user is not authenticated (prevents flash of content before redirect)
+  if (!user) {
+    return null;
+  }
 
   // Clear validation error when a field is updated
   const clearValidationError = (field: string) => {
@@ -267,7 +350,6 @@ export default function PostJobPage() {
         }`,
         description: generateJobDescription(),
         location: formData.jobLocation,
-        type: "CONTRACT",
         metadata: {
           email: formData.email,
           phone: formData.phone,
@@ -403,6 +485,11 @@ Additional Notes: ${formData.additionalNotes}
     );
   };
 
+  // Add function to check if it's the last section
+  const isLastSection = () => {
+    return activeAccordion === accordionSections[accordionSections.length - 1];
+  };
+
   if (authLoading) {
     return (
       <div className="container max-w-3xl py-16 md:py-24 flex items-center justify-center">
@@ -488,6 +575,26 @@ Additional Notes: ${formData.additionalNotes}
                     </p>
                   )}
                 </div>
+                {!isLastSection() && activeAccordion === "client-info" && (
+                  <div className="mt-6">
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      onClick={handleNextSection}
+                      aria-label="Continue to Job Details"
+                    >
+                      <span className="flex items-center gap-2">
+                        Next Section
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    </Button>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                      <span>Section 1 of {accordionSections.length}</span>
+                      <span>Press Ctrl+Enter to continue</span>
+                    </div>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
@@ -746,6 +853,26 @@ Additional Notes: ${formData.additionalNotes}
                     </p>
                   )}
                 </div>
+                {!isLastSection() && activeAccordion === "job-details" && (
+                  <div className="mt-6">
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      onClick={handleNextSection}
+                      aria-label="Continue to Painting Preferences"
+                    >
+                      <span className="flex items-center gap-2">
+                        Next Section
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    </Button>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                      <span>Section 2 of {accordionSections.length}</span>
+                      <span>Press Ctrl+Enter to continue</span>
+                    </div>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
@@ -845,6 +972,27 @@ Additional Notes: ${formData.additionalNotes}
                     </p>
                   )}
                 </div>
+                {!isLastSection() &&
+                  activeAccordion === "painting-preferences" && (
+                    <div className="mt-6">
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                        onClick={handleNextSection}
+                        aria-label="Continue to Project Scope"
+                      >
+                        <span className="flex items-center gap-2">
+                          Next Section
+                          <ChevronRight className="h-4 w-4" />
+                        </span>
+                      </Button>
+                      <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                        <span>Section 3 of {accordionSections.length}</span>
+                        <span>Press Ctrl+Enter to continue</span>
+                      </div>
+                    </div>
+                  )}
               </AccordionContent>
             </AccordionItem>
 
@@ -962,6 +1110,26 @@ Additional Notes: ${formData.additionalNotes}
                     </div>
                   </div>
                 </div>
+                {!isLastSection() && activeAccordion === "project-scope" && (
+                  <div className="mt-6">
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      onClick={handleNextSection}
+                      aria-label="Continue to Additional Requirements"
+                    >
+                      <span className="flex items-center gap-2">
+                        Next Section
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    </Button>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                      <span>Section 4 of {accordionSections.length}</span>
+                      <span>Press Ctrl+Enter to continue</span>
+                    </div>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
@@ -1001,6 +1169,27 @@ Additional Notes: ${formData.additionalNotes}
                     </Label>
                   </div>
                 </div>
+                {!isLastSection() &&
+                  activeAccordion === "additional-requirements" && (
+                    <div className="mt-6">
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                        onClick={handleNextSection}
+                        aria-label="Continue to Attachments"
+                      >
+                        <span className="flex items-center gap-2">
+                          Next Section
+                          <ChevronRight className="h-4 w-4" />
+                        </span>
+                      </Button>
+                      <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                        <span>Section 5 of {accordionSections.length}</span>
+                        <span>Press Ctrl+Enter to continue</span>
+                      </div>
+                    </div>
+                  )}
               </AccordionContent>
             </AccordionItem>
 
@@ -1055,6 +1244,26 @@ Additional Notes: ${formData.additionalNotes}
                     </div>
                   )}
                 </div>
+                {!isLastSection() && activeAccordion === "attachments" && (
+                  <div className="mt-6">
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      onClick={handleNextSection}
+                      aria-label="Continue to Additional Notes"
+                    >
+                      <span className="flex items-center gap-2">
+                        Next Section
+                        <ChevronRight className="h-4 w-4" />
+                      </span>
+                    </Button>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground px-1 mt-2">
+                      <span>Section 6 of {accordionSections.length}</span>
+                      <span>Press Ctrl+Enter to continue</span>
+                    </div>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
@@ -1087,21 +1296,23 @@ Additional Notes: ${formData.additionalNotes}
             </AccordionItem>
           </Accordion>
 
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            disabled={isLoading || !user}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Posting Job...
-              </>
-            ) : (
-              "Post Job"
-            )}
-          </Button>
+          <div className="flex justify-between items-center gap-4">
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={isLoading || !user}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Posting Job...
+                </>
+              ) : (
+                "Post Job"
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </div>

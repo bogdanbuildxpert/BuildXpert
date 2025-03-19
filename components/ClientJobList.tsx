@@ -25,14 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { formatDistance } from "date-fns";
 
 interface Job {
   id: string;
   title: string;
   description: string;
   location: string;
-  salary: number | null;
-  type: string;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -164,9 +163,11 @@ export function ClientJobList({ userId }: ClientJobListProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="OPEN">Open</SelectItem>
-                <SelectItem value="CLOSED">Closed</SelectItem>
-                <SelectItem value="FILLED">Filled</SelectItem>
+                <SelectItem value="PLANNING">Planning</SelectItem>
+                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -212,78 +213,41 @@ export function ClientJobList({ userId }: ClientJobListProps) {
                   <h3 className="font-semibold text-lg">{job.title}</h3>
                   <span
                     className={`text-xs font-medium px-3 py-1 rounded-full ${
-                      job.status === "OPEN"
+                      job.status === "PLANNING"
                         ? "bg-green-100 text-green-800"
-                        : job.status === "FILLED"
+                        : job.status === "IN_PROGRESS"
                         ? "bg-blue-100 text-blue-800"
-                        : "bg-gray-100 text-gray-800"
+                        : job.status === "ON_HOLD"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : job.status === "COMPLETED"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
-                    {job.status === "OPEN"
-                      ? "Open"
-                      : job.status === "FILLED"
-                      ? "Filled"
-                      : "Closed"}
+                    {job.status === "PLANNING"
+                      ? "Planning"
+                      : job.status === "IN_PROGRESS"
+                      ? "In Progress"
+                      : job.status === "ON_HOLD"
+                      ? "On Hold"
+                      : job.status === "COMPLETED"
+                      ? "Completed"
+                      : "Cancelled"}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                   {job.description}
                 </p>
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4 text-primary"
-                    >
-                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                    <span className="truncate">{job.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4 text-primary"
-                    >
-                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                      <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                      <line x1="12" y1="22" x2="12" y2="12"></line>
-                    </svg>
-                    <span>Type: {job.type.replace("_", " ")}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4 text-primary"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <span>Posted: {formatDate(job.createdAt)}</span>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                    <span>{job.location}</span>
+                    <span>•</span>
+                    <span>
+                      Posted{" "}
+                      {formatDistance(new Date(job.createdAt), new Date(), {
+                        addSuffix: true,
+                      })}
+                    </span>
                   </div>
                 </div>
                 <div className="flex justify-between pt-4 border-t border-border">

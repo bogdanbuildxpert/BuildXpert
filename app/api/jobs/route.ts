@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { cookies } from "next/headers";
+import { ProjectStatus } from "@prisma/client";
+import { getProcessedTemplate, transporter } from "@/lib/email";
 
 // GET all jobs
 export async function GET(request: NextRequest) {
@@ -70,22 +72,75 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const { title, description, location, salary, type, metadata } = body;
+    const { title, description, location, metadata } = body;
 
     // Use the user ID from the cookie instead of the one from the request
     const posterId = userData.id;
+
+    // Define the status with specific value that matches the enum
+    const status: ProjectStatus = ProjectStatus.PLANNING;
 
     const job = await prisma.job.create({
       data: {
         title,
         description,
         location,
-        salary: salary ? parseFloat(salary) : null,
-        type: type || "FULL_TIME",
+        status,
         posterId,
-        ...(metadata ? { metadata } : {}),
+        metadata: metadata,
+      },
+      include: {
+        poster: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
+
+    // Send job posting confirmation email
+    if (job.poster && job.poster.email) {
+      try {
+        const jobLink = `${
+          process.env.APP_URL || "http://localhost:3000"
+        }/jobs/${job.id}`;
+
+        // Get email template
+        const { subject, content } = await getProcessedTemplate(
+          "job_posted_confirmation",
+          {
+            name: job.poster.name || job.poster.email.split("@")[0],
+            jobTitle: job.title,
+            location: job.location || "Not specified",
+            postedDate: new Date().toLocaleDateString(),
+            dashboardLink: jobLink,
+          }
+        );
+
+        // Send the email
+        await transporter.sendMail({
+          from: {
+            name: process.env.EMAIL_FROM_NAME || "BuildXpert",
+            address: process.env.EMAIL_SERVER_USER || "",
+          },
+          to: job.poster.email,
+          subject,
+          html: content,
+        });
+
+        console.log(
+          `Job posting confirmation email sent to ${job.poster.email}`
+        );
+      } catch (emailError) {
+        // Log error but don't fail the request
+        console.error(
+          "Error sending job posting confirmation email:",
+          emailError
+        );
+      }
+    }
 
     return NextResponse.json(job, { status: 201 });
   } catch (error) {

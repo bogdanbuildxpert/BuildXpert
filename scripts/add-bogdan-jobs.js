@@ -36,9 +36,7 @@ async function addBogdanJobs() {
         description:
           "Looking for a consultant specializing in green building practices and LEED certification. The ideal candidate will have experience with sustainable materials, energy-efficient designs, and environmental impact assessments for commercial buildings.",
         location: "San Francisco, CA",
-        salary: 95000,
-        type: "CONTRACT",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: user.id,
       },
       {
@@ -46,9 +44,7 @@ async function addBogdanJobs() {
         description:
           "Seeking an experienced specialist in historic building restoration. Must have knowledge of traditional building techniques, period-appropriate materials, and experience working with historical preservation committees. Current project involves restoring a 19th-century Victorian mansion.",
         location: "Boston, MA",
-        salary: 88000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: user.id,
       },
       {
@@ -56,9 +52,7 @@ async function addBogdanJobs() {
         description:
           "We are looking for a technician experienced in installing and configuring smart home systems. Knowledge of home automation, security systems, entertainment systems, and IoT device integration required. Must be comfortable working with both new construction and retrofit projects.",
         location: "Austin, TX",
-        salary: 72000,
-        type: "FULL_TIME",
-        status: "OPEN",
+        status: "PLANNING",
         posterId: user.id,
       },
     ];
@@ -76,7 +70,7 @@ async function addBogdanJobs() {
       `Successfully added ${createdJobs.length} jobs for ${user.email} to the database:`
     );
     createdJobs.forEach((job, index) => {
-      console.log(`${index + 1}. ${job.title} (${job.type}) - ${job.location}`);
+      console.log(`${index + 1}. ${job.title} - ${job.location}`);
     });
   } catch (error) {
     console.error("Error adding jobs:", error);

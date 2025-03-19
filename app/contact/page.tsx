@@ -256,8 +256,10 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-medium">Address</h3>
                     <address className="not-italic text-muted-foreground">
-                      <p>123 Construction Ave</p>
-                      <p>Dublin, Ireland</p>
+                      <p>UNIT 4 FIRST FLOOR, 84 STRAND STREET</p>
+                      <p>SKERRIES</p>
+                      <p>DUBLIN</p>
+                      <p>K34VW93</p>
                     </address>
                   </div>
                 </div>
@@ -311,12 +313,17 @@ export default function ContactPage() {
             </div>
 
             <div className="aspect-[4/3] w-full h-auto rounded-lg overflow-hidden border border-border">
-              {/* This would be replaced with an actual map component in a real implementation */}
-              <img
-                src="/placeholder.svg?height=400&width=600&text=Map"
-                alt="Office location map"
-                className="w-full h-full object-cover"
-              />
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2378.8455487046376!2d-6.1100456231499745!3d53.58269397271422!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x486703c05fb9d2d5%3A0xd463b93084b20a07!2s84%20Strand%20St%2C%20Skerries%2C%20Co.%20Dublin%2C%20K34%20VW93!5e0!3m2!1sen!2sie!4v1719256789644!5m2!1sen!2sie"
+                width="600"
+                height="450"
+                style={{ border: 0 }}
+                allowFullScreen={false}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="w-full h-full"
+                title="BuildXpert Office Location"
+              ></iframe>
             </div>
           </div>
         </div>

@@ -58,7 +58,7 @@ export default function PaintingJobsCarousel({
   }, [api, images]);
 
   return (
-    <div className="w-full px-4">
+    <div className="w-full px-2 sm:px-4">
       <Carousel
         className="w-full max-w-5xl mx-auto"
         setApi={setApi}
@@ -67,11 +67,11 @@ export default function PaintingJobsCarousel({
           align: "start",
         }}
       >
-        <CarouselContent className="-ml-2 md:-ml-4">
+        <CarouselContent className="-ml-1 sm:-ml-2 md:-ml-4">
           {images.map((image, index) => (
             <CarouselItem
               key={index}
-              className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3"
+              className="pl-1 sm:pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
             >
               <div className="h-full">
                 <Card className="border-0 overflow-hidden h-full">
@@ -87,32 +87,37 @@ export default function PaintingJobsCarousel({
                       />
                     </div>
                     <Dialog>
-                      <DialogTrigger>
+                      <DialogTrigger asChild>
                         <div
-                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-secondary/80 backdrop-blur-sm p-2 cursor-pointer hover:bg-secondary"
+                          className="absolute inset-0 cursor-pointer"
                           onClick={() => setSelectedImage(image)}
                         >
-                          <Expand className="h-4 w-4" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="bg-secondary/80 backdrop-blur-sm p-2 rounded-md">
+                              <Expand className="h-5 w-5" />
+                            </div>
+                          </div>
                         </div>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-transparent border-0 [&>button]:hidden">
+                      <DialogContent className="max-w-[100vw] max-h-[100vh] h-[100dvh] w-screen p-0 bg-black/90 border-0 [&>button]:hidden overflow-hidden">
                         <div
-                          className="relative w-full h-full"
+                          className="relative w-full h-full flex items-center justify-center"
                           onClick={nextImage}
                         >
-                          <div className="relative aspect-[16/9] w-full">
+                          <div className="relative w-full h-full max-w-[95vw] max-h-[85vh] md:max-h-[90vh] flex items-center justify-center">
                             <Image
                               src={selectedImage || image}
                               alt={`Painting project ${index + 1}`}
                               fill
-                              sizes="90vw"
-                              className="object-contain rounded-lg"
+                              sizes="(max-width: 768px) 95vw, 90vw"
+                              className="object-contain"
                               priority
+                              quality={90}
                             />
                           </div>
-                          <DialogClose className="absolute top-4 right-4 z-50">
-                            <div className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background flex items-center justify-center cursor-pointer">
-                              <X className="h-4 w-4" />
+                          <DialogClose className="fixed top-4 right-4 sm:top-5 sm:right-5 md:top-6 md:right-6 z-[100]">
+                            <div className="h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full bg-black/80 hover:bg-black/95 text-white flex items-center justify-center cursor-pointer shadow-lg transition-colors border border-white/20">
+                              <X className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
                               <span className="sr-only">Close</span>
                             </div>
                           </DialogClose>
@@ -125,9 +130,9 @@ export default function PaintingJobsCarousel({
             </CarouselItem>
           ))}
         </CarouselContent>
-        <div className="flex justify-center mt-6">
-          <CarouselPrevious className="relative mr-2" />
-          <CarouselNext className="relative ml-2" />
+        <div className="flex justify-center mt-4 sm:mt-6">
+          <CarouselPrevious className="relative mr-2 h-8 w-8 sm:h-10 sm:w-10" />
+          <CarouselNext className="relative ml-2 h-8 w-8 sm:h-10 sm:w-10" />
         </div>
       </Carousel>
     </div>

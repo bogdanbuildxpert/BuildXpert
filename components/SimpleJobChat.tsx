@@ -49,6 +49,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     new Set()
   );
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const socketRef = useRef<any>(null);
   const { resetUnreadCount } = useNotifications();
   // Track processed message IDs to prevent duplicates
@@ -128,10 +129,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
           // Reset unread count in the notifications context
           resetUnreadCount();
 
-          // Scroll to bottom if there are new messages
-          if (hasNewMessages) {
-            scrollToBottom();
-          }
+          // Removed auto-scroll for new messages
         }
       }
     } catch (error) {
@@ -147,6 +145,14 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Only scroll to bottom on initial load, not when messages change
+  useEffect(() => {
+    // Only scroll on initial load
+    if (isLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  }, [isLoading]);
 
   // Function to scroll to the bottom of the messages
   const scrollToBottom = () => {
@@ -220,7 +226,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       ) {
         processedMessageIds.current.add(message.id);
         setMessages((prevMessages) => [...prevMessages, message]);
-        scrollToBottom();
+        // Don't auto-scroll on receiving messages
 
         // Mark the message as read if the current user is the receiver
         if (message.receiverId === user.id) {
@@ -236,6 +242,11 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
 
     // Scroll to bottom when component mounts
     scrollToBottom();
+
+    // Only scroll to bottom on initial load
+    if (messages.length === 0) {
+      scrollToBottom();
+    }
 
     return () => {
       // Clean up socket connection
@@ -274,6 +285,10 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       }
 
       setNewMessage("");
+      // Refocus the textarea after sending
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Failed to send message");
@@ -288,6 +303,10 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage(e as unknown as React.FormEvent);
+      // Refocus the textarea after sending
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -339,6 +358,13 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
           },
         },
       ]);
+
+      // Mark the message as read if the current user is the receiver
+      if (data.receiverId === user.id) {
+        fetch(`/api/messages/${data.id}/read`, {
+          method: "PUT",
+        });
+      }
 
       return true;
     } catch (error) {
@@ -492,6 +518,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Textarea
+            ref={textareaRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={handleKeyPress}

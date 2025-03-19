@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth-utils";
+import { getProcessedTemplate, transporter } from "@/lib/email";
 
 // GET a specific job by ID
 export async function GET(
@@ -18,6 +19,7 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            role: true,
           },
         },
       },
@@ -41,9 +43,9 @@ export async function PUT(
 ) {
   try {
     // Get the current user from the request
-    const currentUser = await getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
 
-    if (!currentUser) {
+    if (!user) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -51,10 +53,9 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { title, description, location, salary, type, status, metadata } =
-      body;
+    const { title, description, location, status, metadata } = body;
 
-    // Check if job exists and get the poster information
+    // Verify the job exists and user has permission to edit
     const existingJob = await prisma.job.findUnique({
       where: {
         id: params.id,
@@ -63,6 +64,8 @@ export async function PUT(
         poster: {
           select: {
             id: true,
+            name: true,
+            email: true,
           },
         },
       },
@@ -72,25 +75,20 @@ export async function PUT(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // Check if the current user is the poster or an admin
-    const isJobPoster = existingJob.poster.id === currentUser.id;
-    const isAdmin =
-      currentUser.role === "ADMIN" || currentUser.role === "admin";
-
-    if (!isJobPoster && !isAdmin) {
+    // Check if the user is the job poster or an admin
+    if (
+      existingJob.poster.id !== user.id &&
+      user.role !== "ADMIN" &&
+      user.role !== "admin"
+    ) {
       return NextResponse.json(
-        { error: "You don't have permission to edit this job" },
+        { error: "Unauthorized. You can only edit your own jobs." },
         { status: 403 }
       );
     }
 
-    // Check if status is being changed and if the user is an admin
-    if (status && status !== existingJob.status && !isAdmin) {
-      return NextResponse.json(
-        { error: "Only administrators can change job status" },
-        { status: 403 }
-      );
-    }
+    // Check if status is changing
+    const isStatusChanging = status && status !== existingJob.status;
 
     // Update the job
     const updatedJob = await prisma.job.update({
@@ -98,15 +96,62 @@ export async function PUT(
         id: params.id,
       },
       data: {
-        title: title || undefined,
-        description: description || undefined,
-        location: location || undefined,
-        salary: salary ? parseFloat(salary) : undefined,
-        type: type || undefined,
+        title,
+        description,
+        location,
         status: status || undefined,
         metadata: metadata || undefined,
-      } as any,
+      },
+      include: {
+        poster: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
     });
+
+    // Send email notification if status is changing
+    if (isStatusChanging && existingJob.poster.email) {
+      try {
+        // Format the status for display
+        const formattedStatus = status.replace("_", " ").toLowerCase();
+        const jobLink = `${
+          process.env.APP_URL || "http://localhost:3000"
+        }/jobs/${params.id}`;
+
+        // Get email template
+        const { subject, content } = await getProcessedTemplate(
+          "job_status_update",
+          {
+            name:
+              existingJob.poster.name || existingJob.poster.email.split("@")[0],
+            jobTitle: updatedJob.title,
+            newStatus: formattedStatus,
+            jobLink,
+          }
+        );
+
+        // Send the email
+        await transporter.sendMail({
+          from: {
+            name: process.env.EMAIL_FROM_NAME || "BuildXpert",
+            address: process.env.EMAIL_SERVER_USER || "",
+          },
+          to: existingJob.poster.email,
+          subject,
+          html: content,
+        });
+
+        console.log(`Status update email sent to ${existingJob.poster.email}`);
+      } catch (emailError) {
+        // Log error but don't fail the request
+        console.error("Error sending status update email:", emailError);
+      }
+    }
 
     return NextResponse.json(updatedJob);
   } catch (error) {
@@ -125,9 +170,9 @@ export async function DELETE(
 ) {
   try {
     // Get the current user from the request
-    const currentUser = await getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
 
-    if (!currentUser) {
+    if (!user) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -143,6 +188,7 @@ export async function DELETE(
         poster: {
           select: {
             id: true,
+            role: true,
           },
         },
       },
@@ -153,9 +199,8 @@ export async function DELETE(
     }
 
     // Check if the current user is the poster or an admin
-    const isJobPoster = existingJob.poster.id === currentUser.id;
-    const isAdmin =
-      currentUser.role === "ADMIN" || currentUser.role === "admin";
+    const isJobPoster = existingJob.poster.id === user.id;
+    const isAdmin = user.role === "ADMIN" || user.role === "admin";
 
     if (!isJobPoster && !isAdmin) {
       return NextResponse.json(

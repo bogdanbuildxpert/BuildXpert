@@ -91,8 +91,10 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-medium mb-4">Contact</h4>
             <address className="not-italic text-sm text-muted-foreground">
-              <p>123 Construction Ave</p>
-              <p>Dublin, Ireland</p>
+              <p>UNIT 4 FIRST FLOOR, 84 STRAND STREET</p>
+              <p>SKERRIES</p>
+              <p>DUBLIN</p>
+              <p>K34VW93</p>
               <p className="mt-2">
                 <a
                   href="mailto:bogdan@buildxpert.ie"

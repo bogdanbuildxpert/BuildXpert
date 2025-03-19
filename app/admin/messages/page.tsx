@@ -149,11 +149,15 @@ export default function AdminMessagesPage() {
                   <h3 className="font-medium text-lg">{job.title}</h3>
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${
-                      job.status === "OPEN"
+                      job.status === "PLANNING"
                         ? "bg-green-100 text-green-800"
-                        : job.status === "FILLED"
+                        : job.status === "IN_PROGRESS"
                         ? "bg-blue-100 text-blue-800"
-                        : "bg-gray-100 text-gray-800"
+                        : job.status === "ON_HOLD"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : job.status === "COMPLETED"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
                     {job.status}

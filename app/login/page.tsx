@@ -32,7 +32,8 @@ export default function LoginPage() {
   });
 
   // Get the redirect URL from the query parameters
-  const redirectUrl = searchParams.get("from") || "/";
+  const redirectUrl =
+    searchParams.get("redirect") || searchParams.get("from") || "/";
 
   // Redirect if already logged in
   useEffect(() => {

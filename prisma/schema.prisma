@@ -117,9 +117,7 @@ model Job {
   title       String
   description String
   location    String?
-  salary      Float?
-  type        JobType   @default(FULL_TIME)
-  status      JobStatus @default(OPEN)
+  status      ProjectStatus @default(PLANNING)
   posterId    String
   poster      User      @relation("JobPoster", fields: [posterId], references: [id])
   applicants  User[]    @relation("AppliedJobs")
@@ -132,13 +130,7 @@ model Job {
   @@index([status])
 }
 
-enum JobType {
-  FULL_TIME
-  PART_TIME
-  CONTRACT
-  TEMPORARY
-}
-
+// Keep the JobStatus enum for backward compatibility with existing data
 enum JobStatus {
   OPEN
   CLOSED

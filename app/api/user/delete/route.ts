@@ -4,6 +4,9 @@ import { cookies } from "next/headers";
 import { compare } from "bcrypt";
 import { getToken } from "next-auth/jwt";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();

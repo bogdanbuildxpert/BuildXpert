@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Trash2, Edit, Eye, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,9 +11,20 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { formatDistance } from "date-fns";
+import { toast } from "sonner";
 
 interface Job {
   id: string;
@@ -35,25 +46,92 @@ export function AdminJobList() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  const fetchJobs = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/jobs");
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs");
+      }
+      const data = await response.json();
+      setJobs(data);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      toast.error("Failed to load jobs");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        const response = await fetch("/api/jobs");
-        if (!response.ok) {
-          throw new Error("Failed to fetch jobs");
-        }
-        const data = await response.json();
-        setJobs(data);
-      } catch (error) {
-        console.error("Error fetching jobs:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchJobs();
   }, []);
+
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      setIsDeleting(true);
+      setJobToDelete(jobId);
+
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete job");
+      }
+
+      // Success - remove job from list
+      setJobs((prevJobs) => prevJobs.filter((job) => job.id !== jobId));
+      toast.success("Job deleted successfully");
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete job"
+      );
+    } finally {
+      setIsDeleting(false);
+      setJobToDelete(null);
+    }
+  };
+
+  const handleDeleteAllJobs = async () => {
+    try {
+      setIsDeletingAll(true);
+
+      const response = await fetch("/api/jobs/bulk-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deleteAll: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete jobs");
+      }
+
+      const result = await response.json();
+
+      // Clear the jobs list
+      setJobs([]);
+      toast.success(result.message || `Successfully deleted all jobs`);
+    } catch (error) {
+      console.error("Error deleting all jobs:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete jobs"
+      );
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   const filteredJobs = jobs.filter(
     (job) =>
@@ -109,9 +187,47 @@ export function AdminJobList() {
             </Select>
           </div>
         </div>
-        <Button asChild>
-          <Link href="/post-job">Post a Job</Link>
-        </Button>
+        <div className="flex gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All Jobs
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 mr-2 text-destructive" />
+                  Delete All Jobs
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete ALL jobs and their associated
+                  messages. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAllJobs}
+                  disabled={isDeletingAll}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {isDeletingAll ? (
+                    <>
+                      <span className="animate-pulse">Deleting...</span>
+                    </>
+                  ) : (
+                    <>I understand, delete everything</>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button asChild>
+            <Link href="/post-job">Post a Job</Link>
+          </Button>
+        </div>
       </div>
 
       {filteredJobs.length === 0 ? (
@@ -124,9 +240,8 @@ export function AdminJobList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredJobs.map((job) => (
-            <Link
+            <div
               key={job.id}
-              href={`/jobs/${job.id}`}
               className="group flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/50"
             >
               <div className="p-5">
@@ -230,8 +345,67 @@ export function AdminJobList() {
                     </div>
                   </div>
                 </div>
+
+                {/* Action buttons */}
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 rounded-full"
+                    asChild
+                  >
+                    <Link href={`/jobs/${job.id}`}>
+                      <Eye className="h-4 w-4" />
+                      <span className="sr-only">View</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 rounded-full"
+                    asChild
+                  >
+                    <Link href={`/jobs/edit/${job.id}`}>
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Edit</span>
+                    </Link>
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2 rounded-full text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this job? This action
+                          cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteJob(job.id)}
+                          disabled={isDeleting && jobToDelete === job.id}
+                          className="bg-destructive hover:bg-destructive/90"
+                        >
+                          {isDeleting && jobToDelete === job.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

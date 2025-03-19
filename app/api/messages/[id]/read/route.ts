@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 // PUT /api/messages/[id]/read - Mark a message as read
 export async function PUT(
   request: NextRequest,

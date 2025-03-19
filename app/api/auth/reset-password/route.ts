@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         { message: "Password reset successfully" },
         { status: 200 }
       );
-    } catch (tokenError) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 400 }

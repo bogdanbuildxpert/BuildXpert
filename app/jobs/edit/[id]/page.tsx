@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Loader2, X, ArrowLeft, ChevronRight } from "lucide-react";
+import { Loader2, X, ArrowLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   Select,
@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import ImageUpload from "@/components/ImageUpload";
 
 interface Job {
   id: string;
@@ -77,10 +78,6 @@ export default function JobEditPage({ params }: JobEditPageProps) {
   const { user, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
-  const [fileReaderPromises, setFileReaderPromises] = useState<
-    Promise<string>[]
-  >([]);
   const [activeAccordion, setActiveAccordion] = useState<string>("client-info");
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
@@ -136,6 +133,11 @@ export default function JobEditPage({ params }: JobEditPageProps) {
 
     // Additional Notes
     additionalNotes: "",
+
+    // Images
+    metadata: {
+      images: [] as string[],
+    },
   });
 
   // Add this array of accordion sections in order
@@ -228,7 +230,13 @@ export default function JobEditPage({ params }: JobEditPageProps) {
 
         // Load existing images if available
         if (metadata.images && Array.isArray(metadata.images)) {
-          setImages(metadata.images);
+          setFormData((prev) => ({
+            ...prev,
+            metadata: {
+              ...prev.metadata,
+              images: metadata.images,
+            },
+          }));
         }
 
         setFormData({
@@ -263,8 +271,13 @@ export default function JobEditPage({ params }: JobEditPageProps) {
 
           // Additional Notes
           additionalNotes: metadata.additionalNotes || "",
+
+          // Images
+          metadata: {
+            images: metadata.images || [],
+          },
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error fetching job:", error);
         toast.error("Failed to load job details");
       } finally {
@@ -335,31 +348,16 @@ export default function JobEditPage({ params }: JobEditPageProps) {
     clearValidationError(field);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      // Limit to 5 images
-      const filesToProcess = Array.from(e.target.files).slice(0, 5);
-
-      // Process each file to create object URLs
-      const newImages = filesToProcess.map((file) => URL.createObjectURL(file));
-
-      // Store the actual files for later processing
-      const fileReaders = filesToProcess.map((file) => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-        });
-      });
-
-      // Store the promises for later resolution during form submission
-      setFileReaderPromises(fileReaders);
-
-      // Update the UI with image previews
-      setImages([...images, ...newImages]);
-    }
+  // Function to handle image upload from the ImageUpload component
+  const handleImageUploaded = (imageUrl: string) => {
+    // Update form data with new image URL
+    setFormData((prev) => ({
+      ...prev,
+      metadata: {
+        ...(prev.metadata || {}),
+        images: [...(prev.metadata?.images || []), imageUrl],
+      },
+    }));
   };
 
   // Validate all required fields regardless of visibility
@@ -414,20 +412,6 @@ export default function JobEditPage({ params }: JobEditPageProps) {
     setIsSaving(true);
 
     try {
-      // Resolve all image promises to get base64 data
-      let imageData: string[] = [...images]; // Start with existing images
-
-      // Process any newly added images
-      if (fileReaderPromises.length > 0) {
-        try {
-          const newImageData = await Promise.all(fileReaderPromises);
-          imageData = [...imageData, ...newImageData];
-        } catch (error) {
-          console.error("Error processing images:", error);
-          // Continue with submission even if image processing fails
-        }
-      }
-
       // Format the data for submission
       const jobData = {
         title: `Painting Job - ${formData.propertyType} Property in ${
@@ -454,7 +438,7 @@ export default function JobEditPage({ params }: JobEditPageProps) {
           userName: user?.name || user?.email,
           startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
           endDate: endDate ? format(endDate, "yyyy-MM-dd") : null,
-          images: imageData, // Add the image data to metadata
+          images: formData.metadata.images,
         },
       };
 
@@ -499,7 +483,7 @@ export default function JobEditPage({ params }: JobEditPageProps) {
 
       toast.success("Job updated successfully");
       router.push(`/jobs/${id}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating job:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to update job"
@@ -1319,62 +1303,28 @@ Additional Notes: ${formData.additionalNotes}
                 Attachments
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label>Photos of the Site</Label>
-                  <div className="border border-dashed border-border rounded-lg p-6 text-center">
-                    <div className="flex flex-col items-center space-y-2">
-                      <Upload className="h-8 w-8 text-muted-foreground" />
-                      <div className="text-sm text-muted-foreground">
-                        <label
-                          htmlFor="image-upload"
-                          className="cursor-pointer text-primary hover:underline"
-                        >
-                          Click to upload
-                        </label>
-                        <span> or drag and drop</span>
-                        <Input
-                          id="image-upload"
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        PNG, JPG or JPEG (max. 5MB each)
-                      </p>
-                    </div>
-                  </div>
-
-                  {images.length > 0 && (
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      {images.map((image, index) => (
-                        <div
-                          key={index}
-                          className="relative aspect-square rounded-md overflow-hidden border border-border"
-                        >
-                          <img
-                            src={image}
-                            alt={`Uploaded image ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-black/80"
-                            onClick={() => {
-                              const newImages = [...images];
-                              newImages.splice(index, 1);
-                              setImages(newImages);
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-6 border rounded-md p-4">
+                  <h3 className="text-sm font-medium mb-3">
+                    Upload Project Images (Optional)
+                  </h3>
+                  <ImageUpload
+                    onImageUpload={handleImageUploaded}
+                    maxImages={10}
+                    path="job-images"
+                    bucket="app-images"
+                    initialImage={
+                      formData.metadata.images &&
+                      formData.metadata.images.length > 0
+                        ? formData.metadata.images[0]
+                        : undefined
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload up to 10 images (max 5MB each). Images will be
+                    automatically compressed before upload.
+                  </p>
                 </div>
+
                 {!isLastSection() && activeAccordion === "attachments" && (
                   <div className="mt-6">
                     <Button

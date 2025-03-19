@@ -80,6 +80,29 @@ BuildXpert is a comprehensive platform for construction painting professionals a
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Setting Up Supabase for Image Storage
+
+BuildXpert uses Supabase for storing and serving job images with automatic compression. Follow these steps to set up Supabase:
+
+1. Create a free Supabase account at [https://supabase.com](https://supabase.com)
+2. Create a new project and note your project URL and anon key
+3. Set up storage:
+   - Go to Storage in the Supabase dashboard
+   - Create a new bucket called `app-images`
+   - Set the bucket's privacy setting to public
+   - Add these policies to the bucket to allow authenticated users to upload and manage files:
+     - For SELECT: `true`
+     - For INSERT: `auth.role() = 'authenticated'`
+     - For UPDATE: `auth.uid() = owner_id`
+     - For DELETE: `auth.uid() = owner_id`
+4. Update your `.env` file with your Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+
+The application will automatically handle image compression before uploading and will store image URLs in the job metadata. Users can upload up to 10 images per job with a maximum file size of 5MB per image. Files are automatically compressed to optimize storage and loading speed.
+
 ## Project Structure
 
 - `/app`: Next.js app router pages and API routes

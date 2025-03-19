@@ -60,7 +60,9 @@ export default function PrivacyPolicyPage() {
           <ul>
             <li>Browser name</li>
             <li>Type of computer or device</li>
-            <li>Technical information about users' connection to our site</li>
+            <li>
+              Technical information about users&apos; connection to our site
+            </li>
             <li>IP address</li>
             <li>Referring site</li>
             <li>Pages visited</li>
@@ -121,21 +123,21 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             Browsing and interaction on any other website, including websites
-            which have a link to our site, is subject to that website's own
+            which have a link to our site, is subject to that website&apos;s own
             terms and policies.
           </p>
 
           <h2>6. Cookies and Tracking Technologies</h2>
           <p>
-            Our site may use "cookies" to enhance user experience. User's web
-            browser places cookies on their hard drive for record-keeping
-            purposes and sometimes to track information about them. Users may
-            choose to set their web browser to refuse cookies or to alert you
-            when cookies are being sent. If they do so, note that some parts of
-            the site may not function properly.
+            Our site may use &quot;cookies&quot; to enhance user experience.
+            User&apos;s web browser places cookies on their hard drive for
+            record-keeping purposes and sometimes to track information about
+            them. Users may choose to set their web browser to refuse cookies or
+            to alert you when cookies are being sent. If they do so, note that
+            some parts of the site may not function properly.
           </p>
 
-          <h2>7. Children's Privacy</h2>
+          <h2>7. Children&apos;s Privacy</h2>
           <p>
             Our service is not directed to anyone under the age of 18. We do not
             knowingly collect personal information from children under 18. If

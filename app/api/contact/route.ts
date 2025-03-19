@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const fullName = `${firstName} ${lastName}`;
 
     // Create contact entry in database
-    const contact = await prisma.contact.create({
+    await prisma.contact.create({
       data: {
         name: fullName,
         email,

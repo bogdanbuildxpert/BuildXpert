@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, PoolClient, QueryResult } from "pg";
 
 // Create a PostgreSQL connection pool
 const pool = new Pool({
@@ -18,7 +18,10 @@ pool.query("SELECT NOW()", (err, res) => {
 });
 
 // Helper function for executing queries
-export async function query(text: string, params?: any[]) {
+export async function query(
+  text: string,
+  params?: unknown[]
+): Promise<QueryResult> {
   try {
     const start = Date.now();
     const res = await pool.query(text, params);
@@ -37,7 +40,7 @@ export async function query(text: string, params?: any[]) {
 
 // Helper function for transactions
 export async function transaction<T>(
-  callback: (client: any) => Promise<T>
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
 

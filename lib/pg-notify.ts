@@ -1,7 +1,6 @@
 import { Client } from "pg";
 import { Server as SocketServer, Socket } from "socket.io";
 import { Server as HttpServer } from "http";
-import { NextApiResponse } from "next";
 import pool from "./pg-client";
 
 // Create a dedicated client for LISTEN/NOTIFY

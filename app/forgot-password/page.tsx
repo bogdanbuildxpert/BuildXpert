@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,6 @@ import { toast } from "sonner";
 import { Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -42,7 +40,7 @@ export default function ForgotPasswordPage() {
       } else {
         toast.error(data.error || "Failed to send reset instructions");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error requesting password reset:", error);
       toast.error("An error occurred. Please try again.");
     } finally {
@@ -56,8 +54,8 @@ export default function ForgotPasswordPage() {
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Reset Your Password</h1>
           <p className="text-muted-foreground">
-            Enter your email address and we'll send you instructions to reset
-            your password
+            Enter your email address and we&apos;ll send you instructions to
+            reset your password
           </p>
         </div>
 
@@ -71,13 +69,13 @@ export default function ForgotPasswordPage() {
                 Check Your Email
               </h2>
               <p className="text-green-600 mb-4">
-                We've sent password reset instructions to:
+                We&apos;ve sent password reset instructions to:
                 <br />
                 <span className="font-medium">{email}</span>
               </p>
               <p className="text-sm text-green-600">
-                If you don't see the email, check your spam folder or make sure
-                you entered the correct email address.
+                If you don&apos;t see the email, check your spam folder or make
+                sure you entered the correct email address.
               </p>
             </div>
 

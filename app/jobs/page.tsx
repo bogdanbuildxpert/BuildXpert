@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AdminJobList } from "@/components/AdminJobList";
 import { ClientJobList } from "@/components/ClientJobList";

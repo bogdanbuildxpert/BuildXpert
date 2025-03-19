@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { Shield } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
-export default function AdminLoginPage() {
+// Create a client component that uses useSearchParams
+function AdminLoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -124,5 +125,20 @@ export default function AdminLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Export the page component with Suspense boundary
+export default function AdminLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <AdminLoginContent />
+    </Suspense>
   );
 }

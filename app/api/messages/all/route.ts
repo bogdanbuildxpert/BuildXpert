@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 // GET /api/messages/all - Get all messages for a user across all jobs
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get the current user from the cookie
     const cookieStore = cookies();

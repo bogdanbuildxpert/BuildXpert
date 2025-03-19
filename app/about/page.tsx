@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import Image from "next/image";
 import PaintingJobsCarousel from "@/components/PaintingJobsCarousel";
 
 // Function to get all painting job images
@@ -34,17 +35,23 @@ export default function AboutPage() {
             </p>
             <p className="text-muted-foreground">
               Our team of skilled painters is committed to delivering
-              exceptional results for every project, whether it's a small
+              exceptional results for every project, whether it&apos;s a small
               residential job or a large commercial undertaking. We take pride
-              in our work and strive to exceed our clients' expectations.
+              in our work and strive to exceed our clients&apos; expectations.
             </p>
           </div>
           <div className="relative flex justify-center">
-            <img
+            <Image
               src="/images/AppImages/ContactUs.webp"
               alt="Our team at BuildXpert"
               className="rounded-lg shadow-md"
-              style={{ maxHeight: "450px", maxWidth: "100%" }}
+              width={500}
+              height={450}
+              style={{
+                maxHeight: "450px",
+                maxWidth: "100%",
+                objectFit: "cover",
+              }}
             />
           </div>
         </div>
@@ -149,9 +156,9 @@ export default function AboutPage() {
             Ready to Work With Us?
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Whether you're planning a new construction project or renovating an
-            existing space, we're here to help with your painting needs. Contact
-            us today to discuss your project.
+            Whether you&apos;re planning a new construction project or
+            renovating an existing space, we&apos;re here to help with your
+            painting needs. Contact us today to discuss your project.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
             <a

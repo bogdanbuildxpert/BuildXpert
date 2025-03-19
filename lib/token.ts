@@ -33,7 +33,7 @@ export const verifyToken = (
       purpose: string;
     };
     return decoded;
-  } catch (error) {
+  } catch {
     throw new Error("Invalid or expired token");
   }
 };

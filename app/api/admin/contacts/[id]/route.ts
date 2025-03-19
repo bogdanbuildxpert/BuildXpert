@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 // DELETE endpoint to remove a contact form submission
 export async function DELETE(
   req: Request,
@@ -21,7 +24,7 @@ export async function DELETE(
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid user data." },
         { status: 403 }

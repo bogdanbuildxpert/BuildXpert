@@ -184,7 +184,7 @@ export function NotificationsProvider({
     return () => {
       socket.disconnect();
     };
-  }, [user]);
+  }, [user, fetchNotifications]);
 
   return (
     <NotificationsContext.Provider

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Loader2, X, Check } from "lucide-react";
+import { ArrowLeft, MapPin, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { SimpleJobChat } from "@/components/SimpleJobChat";
@@ -161,7 +161,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       <div className="container py-16 md:py-24">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold">Job Not Found</h1>
-          <p>The job you're looking for doesn't exist or has been removed.</p>
+          <p>
+            The job you&apos;re looking for doesn&apos;t exist or has been
+            removed.
+          </p>
           <Button asChild>
             <Link href="/jobs">Back to Jobs</Link>
           </Button>

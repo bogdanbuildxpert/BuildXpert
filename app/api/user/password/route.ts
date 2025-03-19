@@ -3,6 +3,9 @@ import prisma from "@/lib/db";
 import { cookies } from "next/headers";
 import { compare, hash } from "bcrypt";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -18,7 +21,7 @@ export async function PUT(request: NextRequest) {
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: "Invalid user data" }, { status: 401 });
     }
 

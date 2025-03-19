@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 // Helper function to check if user is admin
 function isAdmin(req: Request) {
   try {

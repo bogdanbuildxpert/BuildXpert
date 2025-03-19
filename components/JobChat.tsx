@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Loader2, RefreshCw } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 
 interface Message {
   id: string;
@@ -43,12 +43,11 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
-  const socketRef = useRef<any>(null);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "admin";
   const isJobPoster = user?.id === jobPosterId;
@@ -82,7 +81,7 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     if (!user || !isMountedRef.current) return;
 
     try {
-      setIsRefreshing(true);
+      setIsLoading(true);
 
       // For both admin and job poster, we want to see the conversation between them
       const url = `/api/messages?jobId=${jobId}&userId=${user.id}`;
@@ -107,7 +106,6 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
-        setIsRefreshing(false);
       }
     }
   }, [user, jobId]);

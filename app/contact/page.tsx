@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function ContactPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -101,7 +101,7 @@ export default function ContactPage() {
       } else {
         toast.error(data.error || "Failed to send message. Please try again.");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error submitting form:", error);
       toast.error("An error occurred. Please try again later.");
     } finally {

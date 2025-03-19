@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _password, ...userWithoutPassword } = user;
 
     // In a real application, you would create a session or JWT token here
     // For example: const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });

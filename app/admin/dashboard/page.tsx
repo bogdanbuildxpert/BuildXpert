@@ -78,8 +78,6 @@ const recentJobs = [
 ];
 
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState("overview");
-
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}

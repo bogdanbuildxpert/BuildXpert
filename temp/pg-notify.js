@@ -1,19 +1,37 @@
 // PostgreSQL notification functionality
 // This is a basic implementation - modify according to your needs
-const { Pool } = require("pg");
-const { Server } = require("socket.io");
-const { Client } = require("pg");
+import { Pool, Client } from "pg";
+import { Server } from "socket.io";
+import { Socket } from "socket.io";
 
 // Socket.io instance
-let io;
+let io: Server;
 // PostgreSQL notification client
-let notifyClient = null;
+let notifyClient: Client | null = null;
+
+interface ConnectionConfig {
+  user: string;
+  password: string;
+  host: string;
+  port: number;
+  database: string;
+  ssl: boolean | { rejectUnauthorized: boolean };
+}
+
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  jobId: string;
+  content: string;
+  createdAt: string;
+}
 
 // Parse the DATABASE_URL to ensure proper formatting
-function parseConnectionString(connectionString) {
+function parseConnectionString(connectionString?: string): ConnectionConfig {
   try {
     // If it's already a connection object, return it
-    if (typeof connectionString === "object") return connectionString;
+    if (typeof connectionString === "object") return connectionString as ConnectionConfig;
 
     // If connectionString is undefined or null, use default values
     if (!connectionString) {
@@ -86,7 +104,7 @@ const connectionConfig = parseConnectionString(process.env.DATABASE_URL);
 const pool = new Pool(connectionConfig);
 
 // Function to initialize Socket.IO server
-function initSocketServer(server) {
+function initSocketServer(server: Server) {
   // Use a more compatible configuration for Socket.IO
   io = new Server(server, {
     cors: {
@@ -105,11 +123,11 @@ function initSocketServer(server) {
 
   console.log("Socket.IO server initialized with polling transport only");
 
-  io.on("connection", (socket) => {
+  io.on("connection", (socket: Socket) => {
     console.log("Client connected with ID:", socket.id);
 
     // Handle user joining a room (for private messaging)
-    socket.on("join", (userId) => {
+    socket.on("join", (userId: string) => {
       if (userId) {
         socket.join(userId);
         console.log(
@@ -119,7 +137,7 @@ function initSocketServer(server) {
     });
 
     // Handle new message event
-    socket.on("send_message", async (message) => {
+    socket.on("send_message", async (message: Message) => {
       try {
         console.log("Received send_message event:", message);
         // Emit to the sender and receiver rooms
@@ -136,7 +154,7 @@ function initSocketServer(server) {
     });
 
     // Handle marking messages as read
-    socket.on("mark_read", (data) => {
+    socket.on("mark_read", (data: { jobId: string; readBy: string; senderId: string }) => {
       try {
         console.log("Received mark_read event:", data);
         if (data.jobId && data.readBy && data.senderId) {
@@ -430,7 +448,7 @@ async function setupPgNotifyTriggers() {
 }
 
 // Function to listen for notifications on a specific channel
-function listen(channel, callback) {
+function listen(channel: string, callback: (payload: string) => void) {
   try {
     const client = new Pool(connectionConfig);
 
@@ -478,7 +496,7 @@ function listen(channel, callback) {
 }
 
 // Function to send a notification on a specific channel
-async function notify(channel, payload) {
+async function notify(channel: string, payload: string) {
   const client = await pool.connect();
   try {
     await client.query(`NOTIFY ${channel}, '${payload}'`);
@@ -488,7 +506,7 @@ async function notify(channel, payload) {
 }
 
 // Function to mark messages as read
-async function markMessagesAsRead(jobId, userId) {
+async function markMessagesAsRead(jobId: string, userId: string) {
   try {
     const client = await pool.connect();
     try {

@@ -6,8 +6,9 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { toast } from "sonner";
 
 interface User {
@@ -40,9 +41,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const warningShownRef = useRef<boolean>(false);
+  const logoutRef = useRef<() => void>(() => {});
 
-  // Function to reset the inactivity timer
-  const resetInactivityTimer = () => {
+  // The logout function
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+
+    // Also clear the user cookie
+    document.cookie = "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    // Sign out from NextAuth
+    signOut({ redirect: false });
+
+    // Clear inactivity timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+  };
+
+  // Keep logout reference updated
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, []);
+
+  // Function to reset the inactivity timer using useCallback
+  const resetInactivityTimer = useCallback(() => {
     // Clear existing timers
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
@@ -82,11 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           toast.info("You've been logged out due to inactivity", {
             duration: 5000,
           });
-          logout();
+          logoutRef.current();
         }
       }, INACTIVITY_TIMEOUT);
     }
-  };
+  }, [user]); // Only depend on user
 
   // Set up event listeners for user activity
   useEffect(() => {
@@ -117,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(warningTimerRef.current);
       }
     };
-  }, [user]); // Re-run when user changes
+  }, [resetInactivityTimer]); // Re-run when resetInactivityTimer changes
 
   useEffect(() => {
     // Check if user is stored in localStorage as a fallback
@@ -159,27 +188,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Reset inactivity timer on login
     resetInactivityTimer();
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-
-    // Also clear the user cookie
-    document.cookie = "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-    // Sign out from NextAuth
-    signOut({ redirect: false });
-
-    // Clear inactivity timer
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
-    if (warningTimerRef.current) {
-      clearTimeout(warningTimerRef.current);
-      warningTimerRef.current = null;
-    }
   };
 
   return (

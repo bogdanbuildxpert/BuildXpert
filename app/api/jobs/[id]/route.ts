@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserFromRequest } from "@/lib/auth-utils";
 import { getProcessedTemplate, transporter } from "@/lib/email";
+import { deleteImage } from "@/lib/supabase-client";
 
 // GET a specific job by ID
 export async function GET(
@@ -209,11 +210,71 @@ export async function DELETE(
       );
     }
 
-    // Delete the job
-    await prisma.job.delete({
-      where: {
-        id: params.id,
-      },
+    // Delete any associated images from Supabase
+    if (existingJob.metadata && typeof existingJob.metadata === "object") {
+      const metadata = existingJob.metadata as Record<string, unknown>;
+      if (metadata.images && Array.isArray(metadata.images)) {
+        // Process image deletion in parallel
+        const imageDeletePromises = metadata.images.map(
+          async (imageUrl: string) => {
+            try {
+              // Check if we have a valid URL
+              if (!imageUrl || typeof imageUrl !== "string") {
+                console.log(`Skipping invalid image URL: ${imageUrl}`);
+                return;
+              }
+
+              console.log(`Processing image URL: ${imageUrl}`);
+
+              // Extract the file path from the URL using URL parsing
+              try {
+                const url = new URL(imageUrl);
+                const pathSegments = url.pathname.split("/");
+
+                // URL format: /storage/v1/object/public/{bucketName}/{filePath}
+                if (
+                  pathSegments.length >= 6 &&
+                  pathSegments[1] === "storage" &&
+                  pathSegments[4] === "public"
+                ) {
+                  const bucket = pathSegments[5];
+                  const path = pathSegments.slice(6).join("/");
+
+                  console.log(`Deleting image: bucket=${bucket}, path=${path}`);
+                  await deleteImage(path, bucket);
+                } else {
+                  console.log(`URL format not recognized: ${imageUrl}`);
+                }
+              } catch (urlError) {
+                console.error(`Failed to parse URL ${imageUrl}:`, urlError);
+              }
+            } catch (imageError) {
+              console.error(`Failed to delete image ${imageUrl}:`, imageError);
+              // Continue with deletion even if image deletion fails
+            }
+          }
+        );
+
+        // Wait for all image deletions to complete
+        await Promise.all(imageDeletePromises);
+      }
+    }
+
+    // Use a transaction to delete the job and all related records
+    await prisma.$transaction(async (tx) => {
+      // 1. First delete any messages associated with the job
+      await tx.message.deleteMany({
+        where: {
+          jobId: params.id,
+        },
+      });
+
+      // 2. Finally delete the job itself
+      await tx.job.delete({
+        where: {
+          id: params.id,
+        },
+      });
     });
 
     return NextResponse.json({ message: "Job deleted successfully" });

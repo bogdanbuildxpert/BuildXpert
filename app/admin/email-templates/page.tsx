@@ -27,7 +27,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -35,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, Eye, Save } from "lucide-react";
+import Image from "next/image";
 
 // Define the EmailTemplate type
 type EmailTemplate = {
@@ -204,10 +204,11 @@ export default function EmailTemplatesPage() {
       <div className="bg-white p-6 rounded-md shadow-sm max-h-[70vh] overflow-auto">
         <div className="border-b pb-4 mb-4 text-center">
           <div className="flex justify-center mb-2">
-            <img
+            <Image
               src="/favicon.svg"
               alt="BuildXpert Logo"
-              width="40"
+              width={40}
+              height={40}
               className="inline-block"
             />
           </div>
@@ -356,7 +357,7 @@ export default function EmailTemplatesPage() {
                     {selectedTemplate?.name === "contact_confirmation" && (
                       <>
                         <div className="bg-gray-100 p-1 rounded">
-                          {"{{name}}"} - Customer's name
+                          {"{{name}}"} - Customer&apos;s name
                         </div>
                         <div className="bg-gray-100 p-1 rounded">
                           {"{{subject}}"} - Message subject
@@ -369,13 +370,13 @@ export default function EmailTemplatesPage() {
                     {selectedTemplate?.name === "contact_notification" && (
                       <>
                         <div className="bg-gray-100 p-1 rounded">
-                          {"{{name}}"} - Customer's name
+                          {"{{name}}"} - Customer&apos;s name
                         </div>
                         <div className="bg-gray-100 p-1 rounded">
-                          {"{{email}}"} - Customer's email
+                          {"{{email}}"} - Customer&apos;s email
                         </div>
                         <div className="bg-gray-100 p-1 rounded">
-                          {"{{phone}}"} - Customer's phone
+                          {"{{phone}}"} - Customer&apos;s phone
                         </div>
                         <div className="bg-gray-100 p-1 rounded">
                           {"{{subject}}"} - Message subject

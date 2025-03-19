@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         },
         { status: 200 }
       );
-    } catch (tokenError) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 400 }

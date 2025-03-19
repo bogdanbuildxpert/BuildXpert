@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
-export default function VerifyEmail() {
+// Extract the content that uses useSearchParams
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<"verifying" | "success" | "error">(
@@ -40,7 +41,7 @@ export default function VerifyEmail() {
           setStatus("error");
           setMessage(data.error || "Verification failed. Please try again.");
         }
-      } catch (error) {
+      } catch {
         setStatus("error");
         setMessage("An error occurred during verification.");
       }
@@ -70,5 +71,20 @@ export default function VerifyEmail() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrap with Suspense
+export default function VerifyEmail() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Verifying...
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

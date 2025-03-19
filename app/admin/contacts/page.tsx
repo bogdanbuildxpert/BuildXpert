@@ -9,7 +9,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -44,7 +43,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -96,7 +94,6 @@ export default function ContactsPage() {
   });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [responseData, setResponseData] = useState({
     contactId: "",

@@ -22,7 +22,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatDistance } from "date-fns";
@@ -74,7 +73,7 @@ export function ClientJobList({ userId }: ClientJobListProps) {
     if (userId) {
       fetchJobs();
     }
-  }, [userId]);
+  }, [userId, fetchJobs]);
 
   const handleDeleteJob = async () => {
     if (!jobToDelete) return;
@@ -125,16 +124,6 @@ export function ClientJobList({ userId }: ClientJobListProps) {
 
     return matchesSearch && matchesStatus;
   });
-
-  // Function to format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-IE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(date);
-  };
 
   if (isLoading) {
     return <JobListSkeleton />;

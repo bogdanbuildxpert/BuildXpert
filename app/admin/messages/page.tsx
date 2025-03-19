@@ -23,6 +23,9 @@ interface Job {
   messageCount: number;
 }
 
+// API response doesn't include messageCount initially
+interface JobData extends Omit<Job, "messageCount"> {}
+
 export default function AdminMessagesPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
@@ -57,7 +60,7 @@ export default function AdminMessagesPage() {
 
         // For each job, fetch message count
         const jobsWithMessages = await Promise.all(
-          jobsData.map(async (job: any) => {
+          jobsData.map(async (job: JobData) => {
             const messagesResponse = await fetch(
               `/api/messages?jobId=${job.id}`
             );

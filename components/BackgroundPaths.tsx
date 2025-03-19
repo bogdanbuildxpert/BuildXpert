@@ -81,8 +81,8 @@ export function BackgroundPaths({ className }: { className?: string }) {
       const flowDirectionY = Math.sin(globalFlowAngle) * 0.3;
 
       // Define a center point for pattern formations
-      const centerX = width / 2;
-      const centerY = height / 2;
+      // const centerX = width / 2;
+      // const centerY = height / 2;
 
       for (let i = 0; i < numPaths; i++) {
         const x = Math.random() * width;
@@ -207,7 +207,7 @@ export function BackgroundPaths({ className }: { className?: string }) {
             const dx = patternCenter.x - path.x;
             const dy = patternCenter.y - path.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const angle = Math.atan2(dy, dx);
+            // const angle = Math.atan2(dy, dx);
 
             // Different pattern behaviors
             switch (patternType) {
@@ -245,7 +245,7 @@ export function BackgroundPaths({ className }: { className?: string }) {
 
               case "wave":
                 // Wave pattern across the screen
-                const waveAmplitude = 30 + (index % 4) * 10;
+                // const waveAmplitude = 30 + (index % 4) * 10;
                 const waveFrequency = 0.02 + (index % 3) * 0.01;
                 const wavePhase = animationTime * 0.5 + path.phase;
 

@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { cookies } from "next/headers";
-import { ProjectStatus } from "@prisma/client";
+import { Prisma, ProjectStatus, JobStatus } from "@prisma/client";
 import { getProcessedTemplate, transporter } from "@/lib/email";
+
+// Define a type that has all the fields needed after job creation
+type JobWithPoster = {
+  id: string;
+  title: string;
+  description: string;
+  location: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  poster: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+  [key: string]: any;
+};
+
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
 
 // GET all jobs
 export async function GET(request: NextRequest) {
@@ -56,7 +76,7 @@ export async function POST(request: NextRequest) {
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid user data. Please log in again." },
         { status: 401 }
@@ -77,15 +97,13 @@ export async function POST(request: NextRequest) {
     // Use the user ID from the cookie instead of the one from the request
     const posterId = userData.id;
 
-    // Define the status with specific value that matches the enum
-    const status: ProjectStatus = ProjectStatus.PLANNING;
-
-    const job = await prisma.job.create({
+    // Create the job with proper typing
+    const job = (await prisma.job.create({
       data: {
         title,
         description,
         location,
-        status,
+        status: "PLANNING",
         posterId,
         metadata: metadata,
       },
@@ -98,7 +116,7 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-    });
+    })) as unknown as JobWithPoster;
 
     // Send job posting confirmation email
     if (job.poster && job.poster.email) {

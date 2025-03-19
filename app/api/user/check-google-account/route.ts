@@ -3,6 +3,9 @@ import prisma from "@/lib/db";
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
         try {
           const userData = JSON.parse(userCookie);
           userEmail = userData.email;
-        } catch (error) {
+        } catch {
           return NextResponse.json(
             { error: "Invalid user data" },
             { status: 401 }

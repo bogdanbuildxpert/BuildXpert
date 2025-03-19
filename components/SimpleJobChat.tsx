@@ -5,9 +5,9 @@ import { useAuth } from "@/lib/auth-context";
 import { useNotifications } from "@/lib/notifications-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Send, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 
 interface Message {
   id: string;
@@ -50,7 +50,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
   );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const socketRef = useRef<any>(null);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const { resetUnreadCount } = useNotifications();
   // Track processed message IDs to prevent duplicates
   const processedMessageIds = useRef<Set<string>>(new Set());
@@ -161,7 +161,7 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     }
   };
 
-  // Initialize Socket.IO connection
+  // Fetch messages when component mounts and when the job or user changes
   useEffect(() => {
     if (!user) return;
 
@@ -243,16 +243,11 @@ export function SimpleJobChat({ jobId, jobPosterId }: SimpleJobChatProps) {
     // Scroll to bottom when component mounts
     scrollToBottom();
 
-    // Only scroll to bottom on initial load
-    if (messages.length === 0) {
-      scrollToBottom();
-    }
-
+    // Clean up function
     return () => {
-      // Clean up socket connection
       socket.disconnect();
     };
-  }, [user, jobId]);
+  }, [user, jobId, fetchMessages, scrollToBottom, messages.length]);
 
   // Handle sending a message
   const handleSendMessage = async (e: React.FormEvent) => {

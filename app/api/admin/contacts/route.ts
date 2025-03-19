@@ -3,6 +3,12 @@ import prisma from "@/lib/prisma";
 import { transporter } from "@/lib/email";
 import { cookies } from "next/headers";
 
+// Define the ContactStatus enum to match Prisma schema
+type ContactStatus = "NEW" | "REVIEWED" | "RESPONDED" | "ARCHIVED";
+
+// Mark this route as dynamic since it uses cookies
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // Check if user is authenticated and is an admin using cookies
@@ -18,7 +24,7 @@ export async function GET(req: Request) {
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid user data." },
         { status: 403 }
@@ -40,7 +46,7 @@ export async function GET(req: Request) {
     const skip = (page - 1) * limit;
 
     // Build filter conditions
-    const where = status ? { status: status as any } : {};
+    const where = status ? { status: status as ContactStatus } : {};
 
     // Get contacts with pagination
     const contacts = await prisma.contact.findMany({
@@ -87,7 +93,7 @@ export async function PATCH(req: Request) {
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid user data." },
         { status: 403 }
@@ -112,7 +118,7 @@ export async function PATCH(req: Request) {
 
     const updatedContact = await prisma.contact.update({
       where: { id },
-      data: { status: status as any },
+      data: { status: status as ContactStatus },
     });
 
     return NextResponse.json(updatedContact);
@@ -141,7 +147,7 @@ export async function POST(req: Request) {
     let userData;
     try {
       userData = JSON.parse(userCookie);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid user data." },
         { status: 403 }
@@ -238,7 +244,7 @@ export async function POST(req: Request) {
     // Update contact status to RESPONDED
     await prisma.contact.update({
       where: { id: contactId },
-      data: { status: "RESPONDED" },
+      data: { status: "RESPONDED" as ContactStatus },
     });
 
     return NextResponse.json({

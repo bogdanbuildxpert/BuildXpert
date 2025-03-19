@@ -11,7 +11,6 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Expand, X } from "lucide-react";
 import {
   Dialog,
@@ -55,7 +54,7 @@ export default function PaintingJobsCarousel({
         clearInterval(timerRef.current);
       }
     };
-  }, [api, images]);
+  }, [api, images, nextImage]);
 
   return (
     <div className="w-full px-2 sm:px-4">

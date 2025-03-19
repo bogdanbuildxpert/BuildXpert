@@ -63,7 +63,7 @@ export async function getProcessedTemplate(
 ): Promise<{ subject: string; content: string }> {
   try {
     // Find the email template in the database
-    const template = await (prisma as any).emailTemplate.findUnique({
+    const template = await prisma.emailTemplate.findUnique({
       where: { name: templateName },
     });
 

@@ -9,6 +9,7 @@ import { NotificationsProvider } from "@/lib/notifications-context";
 import { Toaster } from "sonner";
 import { Providers } from "./providers";
 import dynamic from "next/dynamic";
+import Script from "next/script";
 
 // Dynamically import the InactivityMonitor with no SSR
 const InactivityMonitor = dynamic(
@@ -20,13 +21,69 @@ const inter = Inter({ subsets: ["latin"] });
 
 // Update the metadata title and description
 export const metadata: Metadata = {
-  title: "BuildXpert - Construction Expertise",
-  description: "Professional construction and building services by BuildXpert",
-  generator: "v0.dev",
+  metadataBase: new URL("https://buildxpert.ie"),
+  title: {
+    default: "BuildXpert - Professional Painting Services",
+    template: "%s | BuildXpert",
+  },
+  description:
+    "BuildXpert offers high-quality professional painting services for commercial and residential projects across Ireland with exceptional customer service and attention to detail.",
+  keywords: [
+    "painting services",
+    "professional painters",
+    "commercial painting",
+    "residential painting",
+    "construction services",
+    "Ireland",
+    "building contractors",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "en_IE",
+    url: "https://buildxpert.ie",
+    title: "BuildXpert - Professional Painting Services",
+    description:
+      "Professional painting services for commercial and residential projects with attention to detail and client satisfaction.",
+    siteName: "BuildXpert",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "BuildXpert - Professional Painting Services",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BuildXpert - Professional Painting Services",
+    description:
+      "Professional painting services for commercial and residential projects with attention to detail and client satisfaction.",
+    images: ["/og-image.jpg"],
+  },
+  alternates: {
+    canonical: "https://buildxpert.ie",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+      "max-snippet": -1,
+    },
+  },
+  generator: "BuildXpert Website",
   icons: {
     icon: {
       url: "/favicon.svg",
       type: "image/svg+xml",
+    },
+    apple: {
+      url: "/apple-touch-icon.png",
+      sizes: "180x180",
     },
   },
 };
@@ -67,6 +124,20 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
+        {/* Global Site Tag - Google Analytics */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=G-MEASUREMENT_ID`}
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-MEASUREMENT_ID');
+          `}
+        </Script>
+
         <Providers>
           <AuthProvider>
             <NotificationsProvider>

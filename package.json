@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev",
+    "dev:custom": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "NODE_ENV=production node server.js || next start",
+    "start:next": "next start",
     "restart": "taskkill /F /IM node.exe && npm run dev",
     "restart:unix": "kill -9 $(lsof -t -i:3000) && npm run dev",
     "lint": "next lint",

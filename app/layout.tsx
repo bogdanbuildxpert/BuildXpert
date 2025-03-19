@@ -77,13 +77,23 @@ export const metadata: Metadata = {
   },
   generator: "BuildXpert Website",
   icons: {
-    icon: {
-      url: "/favicon.svg",
-      type: "image/svg+xml",
-    },
+    icon: [
+      {
+        url: "/images/AppImages/TabLogo.webp",
+        type: "image/webp",
+      },
+      {
+        url: "/favicon.svg",
+        type: "image/svg+xml",
+      },
+    ],
     apple: {
-      url: "/apple-touch-icon.png",
-      sizes: "180x180",
+      url: "/images/AppImages/TabLogo.webp",
+      type: "image/webp",
+    },
+    shortcut: {
+      url: "/images/AppImages/TabLogo.webp",
+      type: "image/webp",
     },
   },
 };
@@ -96,6 +106,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link
+          rel="icon"
+          href="/images/AppImages/TabLogo.webp"
+          type="image/webp"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `

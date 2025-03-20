@@ -8,29 +8,6 @@ export async function POST(request: NextRequest) {
   try {
     console.log("[api/auth/register] Registration request received");
 
-    // Check if this is a static build
-    const isStaticBuild =
-      process.env.NEXT_PHASE === "phase-production-build" ||
-      process.env.VERCEL_ENV === "production" ||
-      (process.env.NODE_ENV === "production" && process.env.VERCEL);
-
-    // For static builds during Next.js static generation, return a specific response
-    if (isStaticBuild) {
-      console.log(
-        "[api/auth/register] Static build detected, skipping actual registration"
-      );
-      return NextResponse.json(
-        {
-          id: "mock-user-id",
-          name: "Mock User",
-          email: "mock@example.com",
-          role: "CLIENT",
-          message: "Mock registration successful. This is a static build.",
-        },
-        { status: 201 }
-      );
-    }
-
     // Parse the request body
     let body;
     try {
@@ -125,22 +102,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("[api/auth/register] Error registering user:", error);
-
-    // Check if this is a database connection error
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    const isDbError =
-      errorMessage.toLowerCase().includes("database") ||
-      errorMessage.toLowerCase().includes("prisma") ||
-      errorMessage.toLowerCase().includes("connection");
-
+    console.error("[api/auth/register] Registration error:", error);
     return NextResponse.json(
-      {
-        error: isDbError
-          ? "Database connection error. Please try again later."
-          : "Failed to register user. Please try again.",
-      },
+      { error: "Failed to register user" },
       { status: 500 }
     );
   }

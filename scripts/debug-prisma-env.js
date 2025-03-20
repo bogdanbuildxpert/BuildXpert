@@ -28,17 +28,15 @@ const isVercelProd =
   process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production";
 const isStaticBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-// In Vercel production build, we need to use prisma:// protocol (for Prisma Accelerate)
-if ((isVercelProd || isStaticBuild) && protocol === "postgresql") {
-  // This is a special case for Vercel - they need prisma:// protocol
-  console.log("🔄 Vercel production detected - using mock DATABASE_URL");
-  // Use a placeholder prisma:// URL for static builds
-  process.env.DATABASE_URL =
-    "prisma://aws-eu-west-1.prisma-data.com/?api_key=mock-key-for-static-build";
+// Always use the real database connection - no more mock URLs
+if (isVercelProd || isStaticBuild) {
+  console.log("🔄 Production build detected - using real DATABASE_URL");
 
-  // Keep the DIRECT_URL for actual data access
+  // Ensure DIRECT_URL is set to the original DATABASE_URL for direct connection
   if (!process.env.DIRECT_URL) {
-    console.log("📝 Setting DIRECT_URL to original DATABASE_URL");
+    console.log(
+      "📝 Setting DIRECT_URL to original DATABASE_URL for direct connection"
+    );
     process.env.DIRECT_URL = dbUrl;
   }
 } else if (protocol === "prisma" && !isVercelProd && !isStaticBuild) {

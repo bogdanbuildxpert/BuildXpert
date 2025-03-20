@@ -29,18 +29,14 @@ console.log("[db.ts] Environment info:", {
   isStaticBuild: isStaticBuild,
 });
 
-// For static builds during Vercel deployments, we'll just use a mock client
-// and not try to connect to the database at all
-if (isStaticBuild) {
-  console.log("[db.ts] Static build detected - using mock Prisma client only");
+// Always use the real database connection
+// We're removing the mock client for static builds
+console.log("[db.ts] Using real database connection for all environments");
 
-  // Ensure we have a valid placeholder URL for static builds
-  // This is just to pass validation - we won't actually connect
-  databaseUrl =
-    "postgresql://placeholder:placeholder@placeholder:5432/placeholder";
-  console.log(
-    "[db.ts] Using placeholder PostgreSQL URL for static build (no actual connection)"
-  );
+// Ensure we're using the DIRECT_URL if it exists (important for Vercel)
+if (process.env.DIRECT_URL && isStaticBuild) {
+  console.log("[db.ts] Using DIRECT_URL for database connection in Vercel");
+  databaseUrl = process.env.DIRECT_URL;
 }
 
 console.log(
@@ -50,102 +46,22 @@ console.log(
     : databaseUrl.split("://")[0]
 );
 
-// Create a mock Prisma client or use the real one - ALWAYS use mock for static builds
-export const prisma = isStaticBuild
-  ? createMockPrismaClient() // Always use mock for static builds
-  : globalForPrisma.prisma ||
-    new PrismaClient({
-      log:
-        process.env.NODE_ENV === "development"
-          ? ["query", "error", "warn"]
-          : ["error"],
-      datasources: {
-        db: {
-          url: databaseUrl,
-        },
+// Create a real PrismaClient - no more mock client for static builds
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+    datasources: {
+      db: {
+        url: databaseUrl,
       },
-    });
+    },
+  });
 
 // Only store the client in global scope if not in production
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-
-// Create a mock Prisma client that returns empty data for static generation
-function createMockPrismaClient() {
-  console.log("[db.ts] Using mock Prisma client for static build");
-
-  // This is a simple mock that returns empty arrays or nulls
-  const mockClient = {
-    user: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    job: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    contact: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    project: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    emailTemplate: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    // Mock connection methods
-    $connect: async () => {
-      console.log(
-        "[db.ts] Mock $connect called - no actual database connection"
-      );
-      return Promise.resolve();
-    },
-    $disconnect: async () => {
-      console.log(
-        "[db.ts] Mock $disconnect called - no actual database connection"
-      );
-      return Promise.resolve();
-    },
-    $executeRawUnsafe: async () => {
-      console.log(
-        "[db.ts] Mock $executeRawUnsafe called - no actual query execution"
-      );
-      return Promise.resolve(0);
-    },
-    $queryRaw: async () => {
-      console.log("[db.ts] Mock $queryRaw called - no actual query execution");
-      return Promise.resolve([]);
-    },
-  };
-
-  return mockClient as unknown as PrismaClient;
-}
 
 export default prisma;

@@ -14,39 +14,31 @@ export async function GET() {
     let userCount = -1;
     let error = null;
 
-    // Check if we're in a static build
+    // Check if we're in a static build (for informational purposes only)
     const isStaticBuild =
       process.env.NEXT_PHASE === "phase-production-build" ||
       process.env.VERCEL_ENV === "production" ||
       (process.env.NODE_ENV === "production" && process.env.VERCEL);
 
-    if (isStaticBuild) {
-      // In static builds, don't try to connect to the database
-      console.log(
-        "Static build detected - skipping actual database connection"
-      );
-      connectionStatus = "Skipped (static build)";
-      userCount = 0;
-    } else {
+    // Always try to connect to the real database
+    try {
+      // Test if we can connect to the database
+      await prisma.$connect();
+      connectionStatus = "Connected";
+
+      // Try a simple query
+      userCount = await prisma.user.count();
+
+      console.log("Database connection successful, user count:", userCount);
+    } catch (dbError) {
+      connectionStatus = "Error";
+      error = dbError instanceof Error ? dbError.message : String(dbError);
+      console.error("Database connection error:", error);
+    } finally {
       try {
-        // Test if we can connect to the database
-        await prisma.$connect();
-        connectionStatus = "Connected";
-
-        // Try a simple query
-        userCount = await prisma.user.count();
-
-        console.log("Database connection successful, user count:", userCount);
-      } catch (dbError) {
-        connectionStatus = "Error";
-        error = dbError instanceof Error ? dbError.message : String(dbError);
-        console.error("Database connection error:", error);
-      } finally {
-        try {
-          await prisma.$disconnect();
-        } catch (disconnectError) {
-          console.error("Error disconnecting from database:", disconnectError);
-        }
+        await prisma.$disconnect();
+      } catch (disconnectError) {
+        console.error("Error disconnecting from database:", disconnectError);
       }
     }
 

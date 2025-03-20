@@ -1,0 +1,15 @@
+[1mdiff --git a/package.json b/package.json[m
+[1mindex c8c8b52..a8f5304 100644[m
+[1m--- a/package.json[m
+[1m+++ b/package.json[m
+[36m@@ -16,8 +16,8 @@[m
+     "restart": "taskkill /F /IM node.exe && npm run dev",[m
+     "restart:unix": "kill -9 $(lsof -t -i:3000) && npm run dev",[m
+     "lint": "next lint",[m
+[31m-    "prisma:generate": "prisma generate",[m
+[31m-    "prisma:migrate": "prisma migrate dev",[m
+[32m+[m[32m    // "prisma:generate": "prisma generate",[m
+[32m+[m[32m    // "prisma:migrate": "prisma migrate dev",[m
+     "prisma:studio": "prisma studio",[m
+     "prisma:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",[m
+     "migrate:postgres": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/migrate-to-postgres.ts",[m

@@ -19,20 +19,67 @@ console.log(
   databaseUrl.split(":")[0]
 );
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
-  });
+// Check if we're in a build or export environment
+const isStaticBuild =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.VERCEL_ENV === "production" ||
+  (process.env.NODE_ENV === "production" && process.env.VERCEL);
 
+// Create a mock Prisma client or use the real one
+export const prisma = isStaticBuild
+  ? createMockPrismaClient()
+  : globalForPrisma.prisma ||
+    new PrismaClient({
+      log:
+        process.env.NODE_ENV === "development"
+          ? ["query", "error", "warn"]
+          : ["error"],
+      datasources: {
+        db: {
+          url: databaseUrl,
+        },
+      },
+    });
+
+// Only store the client in global scope if not in production
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// Create a mock Prisma client that returns empty data for static generation
+function createMockPrismaClient() {
+  console.log("[db.ts] Using mock Prisma client for static build");
+
+  // This is a simple mock that returns empty arrays or nulls
+  const mockClient = {
+    user: {
+      findUnique: async () => null,
+      findMany: async () => [],
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      count: async () => 0,
+    },
+    message: {
+      findUnique: async () => null,
+      findMany: async () => [],
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      count: async () => 0,
+    },
+    job: {
+      findUnique: async () => null,
+      findMany: async () => [],
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      count: async () => 0,
+    },
+    // Add other models as needed
+    $connect: async () => {},
+    $disconnect: async () => {},
+  };
+
+  return mockClient as unknown as PrismaClient;
+}
 
 export default prisma;

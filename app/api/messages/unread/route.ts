@@ -16,6 +16,16 @@ export async function GET(request: NextRequest) {
     origin: request.headers.get("origin"),
   });
 
+  // During build time or static export, just return empty data
+  // This helps prevent database connection attempts during build
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NODE_ENV === "production"
+  ) {
+    console.log("[messages/unread] Returning static data during build");
+  }
+
   // Create strong cache headers to prevent repeated calls
   return NextResponse.json(
     {

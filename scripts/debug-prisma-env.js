@@ -23,18 +23,29 @@ const protocol = dbUrlParts[0];
 
 console.log(`📊 Database URL protocol: ${protocol}`);
 
-// Check for correct protocol
-if (protocol !== "postgresql") {
-  console.warn(
-    `⚠️ DATABASE_URL protocol is ${protocol}, but should be postgresql`
-  );
+// Check if we're in Vercel production environment
+const isVercelProd =
+  process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production";
+const isStaticBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-  // Try to fix the URL
-  if (protocol === "prisma") {
-    const correctedUrl = "postgresql://" + dbUrlParts[1];
-    console.log(`🔧 Setting corrected DATABASE_URL: postgresql://****`);
-    process.env.DATABASE_URL = correctedUrl;
+// In Vercel production build, we need to use prisma:// protocol (for Prisma Accelerate)
+if ((isVercelProd || isStaticBuild) && protocol === "postgresql") {
+  // This is a special case for Vercel - they need prisma:// protocol
+  console.log("🔄 Vercel production detected - using mock DATABASE_URL");
+  // Use a placeholder prisma:// URL for static builds
+  process.env.DATABASE_URL =
+    "prisma://aws-eu-west-1.prisma-data.com/?api_key=mock-key-for-static-build";
+
+  // Keep the DIRECT_URL for actual data access
+  if (!process.env.DIRECT_URL) {
+    console.log("📝 Setting DIRECT_URL to original DATABASE_URL");
+    process.env.DIRECT_URL = dbUrl;
   }
+} else if (protocol === "prisma" && !isVercelProd && !isStaticBuild) {
+  // In non-Vercel environments, we might want to fix prisma:// to postgresql://
+  const correctedUrl = "postgresql://" + dbUrlParts[1];
+  console.log(`🔧 Setting corrected DATABASE_URL: postgresql://****`);
+  process.env.DATABASE_URL = correctedUrl;
 }
 
 // Check for DIRECT_URL
@@ -48,7 +59,7 @@ if (!directUrl) {
 
   console.log(`📊 Direct URL protocol: ${directProtocol}`);
 
-  // Check for correct protocol
+  // Check for correct protocol for DIRECT_URL
   if (directProtocol !== "postgresql") {
     console.warn(
       `⚠️ DIRECT_URL protocol is ${directProtocol}, but should be postgresql`

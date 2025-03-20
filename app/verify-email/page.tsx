@@ -12,6 +12,7 @@ function VerifyEmailContent() {
     "verifying"
   );
   const [message, setMessage] = useState("Verifying your email...");
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -24,6 +25,11 @@ function VerifyEmailContent() {
       }
 
       try {
+        console.log(
+          "Sending verification request with token:",
+          token.substring(0, 10) + "..."
+        );
+
         const response = await fetch("/api/auth/verify-email", {
           method: "POST",
           headers: {
@@ -33,6 +39,7 @@ function VerifyEmailContent() {
         });
 
         const data = await response.json();
+        console.log("Verification response:", data);
 
         if (response.ok) {
           setStatus("success");
@@ -40,10 +47,19 @@ function VerifyEmailContent() {
         } else {
           setStatus("error");
           setMessage(data.error || "Verification failed. Please try again.");
+
+          // Set detailed error info for debugging
+          if (data.details) {
+            setErrorDetails(data.details);
+          }
         }
-      } catch {
+      } catch (error) {
+        console.error("Verification error:", error);
         setStatus("error");
         setMessage("An error occurred during verification.");
+        setErrorDetails(
+          error instanceof Error ? error.message : "Unknown error"
+        );
       }
     };
 
@@ -62,11 +78,35 @@ function VerifyEmailContent() {
           >
             {message}
           </p>
+
+          {errorDetails && status === "error" && (
+            <div className="mt-4 p-3 bg-destructive/10 text-destructive text-sm rounded-md text-left">
+              <p className="font-semibold">Error details:</p>
+              <p className="font-mono text-xs break-all">{errorDetails}</p>
+            </div>
+          )}
         </div>
 
         {status !== "verifying" && (
           <div className="flex justify-center">
-            <Button onClick={() => router.push("/login")}>Go to Login</Button>
+            {status === "success" ? (
+              <Button onClick={() => router.push("/login")}>Go to Login</Button>
+            ) : (
+              <div className="space-y-2">
+                <Button onClick={() => router.push("/login")}>
+                  Go to Login
+                </Button>
+                <div className="text-center">
+                  <Button
+                    variant="link"
+                    onClick={() => router.push("/api/auth/resend-verification")}
+                    className="text-sm"
+                  >
+                    Resend verification email
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

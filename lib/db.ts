@@ -10,20 +10,27 @@ require("./prisma-config");
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 // Make sure we're using the correct DATABASE_URL
-const databaseUrl =
+let databaseUrl =
   process.env.DATABASE_URL ||
   "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
-
-console.log(
-  "[db.ts] Database connection using URL protocol:",
-  databaseUrl.split(":")[0]
-);
 
 // Check if we're in a build or export environment
 const isStaticBuild =
   process.env.NEXT_PHASE === "phase-production-build" ||
   process.env.VERCEL_ENV === "production" ||
   (process.env.NODE_ENV === "production" && process.env.VERCEL);
+
+// For Vercel static builds, we need to use prisma:// protocol
+if (isStaticBuild && databaseUrl.startsWith("postgresql://")) {
+  databaseUrl =
+    "prisma://aws-eu-west-1.prisma-data.com/?api_key=mock-key-for-static-build";
+  console.log("[db.ts] Using Prisma Accelerate URL format for static build");
+}
+
+console.log(
+  "[db.ts] Database connection using URL protocol:",
+  databaseUrl.split(":")[0]
+);
 
 // Create a mock Prisma client or use the real one
 export const prisma = isStaticBuild
@@ -51,15 +58,6 @@ function createMockPrismaClient() {
   // This is a simple mock that returns empty arrays or nulls
   const mockClient = {
     user: {
-      findUnique: async () => null,
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      count: async () => 0,
-    },
-    message: {
       findUnique: async () => null,
       findFirst: async () => null,
       findMany: async () => [],

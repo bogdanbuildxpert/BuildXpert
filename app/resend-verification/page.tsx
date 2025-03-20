@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
-export default function ResendVerificationPage() {
+// Extract the content that uses useSearchParams
+function ResendVerificationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -147,5 +148,20 @@ export default function ResendVerificationPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrap with Suspense
+export default function ResendVerificationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <ResendVerificationContent />
+    </Suspense>
   );
 }

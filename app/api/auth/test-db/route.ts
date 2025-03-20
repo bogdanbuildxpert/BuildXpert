@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db";
 
 export async function GET() {
   try {
@@ -14,24 +14,39 @@ export async function GET() {
     let userCount = -1;
     let error = null;
 
-    try {
-      // Test if we can connect to the database
-      await prisma.$connect();
-      connectionStatus = "Connected";
+    // Check if we're in a static build
+    const isStaticBuild =
+      process.env.NEXT_PHASE === "phase-production-build" ||
+      process.env.VERCEL_ENV === "production" ||
+      (process.env.NODE_ENV === "production" && process.env.VERCEL);
 
-      // Try a simple query
-      userCount = await prisma.user.count();
-
-      console.log("Database connection successful, user count:", userCount);
-    } catch (dbError) {
-      connectionStatus = "Error";
-      error = dbError instanceof Error ? dbError.message : String(dbError);
-      console.error("Database connection error:", error);
-    } finally {
+    if (isStaticBuild) {
+      // In static builds, don't try to connect to the database
+      console.log(
+        "Static build detected - skipping actual database connection"
+      );
+      connectionStatus = "Skipped (static build)";
+      userCount = 0;
+    } else {
       try {
-        await prisma.$disconnect();
-      } catch (disconnectError) {
-        console.error("Error disconnecting from database:", disconnectError);
+        // Test if we can connect to the database
+        await prisma.$connect();
+        connectionStatus = "Connected";
+
+        // Try a simple query
+        userCount = await prisma.user.count();
+
+        console.log("Database connection successful, user count:", userCount);
+      } catch (dbError) {
+        connectionStatus = "Error";
+        error = dbError instanceof Error ? dbError.message : String(dbError);
+        console.error("Database connection error:", error);
+      } finally {
+        try {
+          await prisma.$disconnect();
+        } catch (disconnectError) {
+          console.error("Error disconnecting from database:", disconnectError);
+        }
       }
     }
 
@@ -62,11 +77,7 @@ export async function GET() {
       postgresPort: process.env.POSTGRES_PORT || "Not set",
       postgresDb: process.env.POSTGRES_DB || "Not set",
       postgresUser: process.env.POSTGRES_USER ? "Set (hidden)" : "Not set",
-      isStatic:
-        process.env.NEXT_PHASE === "phase-production-build" ||
-        process.env.VERCEL_ENV === "production" ||
-        (process.env.NODE_ENV === "production" && process.env.VERCEL) ||
-        false,
+      isStatic: isStaticBuild,
     };
 
     return NextResponse.json({

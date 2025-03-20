@@ -5,9 +5,7 @@ generator client {
   previewFeatures = ["driverAdapters"]
   binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
   // This ensures the hook runs on all environments including Vercel
-  hooks = {
-    pregenerate = "node ./pregenerate.js"
-  }
+  pregenerate = "node ./pregenerate.js"
 }
 
 datasource db {

@@ -14,6 +14,8 @@
     "POSTGRES_PASSWORD": "Madalina123",
     "POSTGRES_DB": "buildxpert",
     "POSTGRES_HOST": "178.62.45.226",
-    "POSTGRES_PORT": "5432"
+    "POSTGRES_PORT": "5432",
+    "NEXT_PUBLIC_APP_URL": "https://buildxpert.ie",
+    "APP_URL": "https://buildxpert.ie"
   }
 }

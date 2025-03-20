@@ -87,8 +87,28 @@ export async function getProcessedTemplate(
   }
 }
 
+// Helper function to get the correct app URL
+function getAppUrl(): string {
+  // First, try to use NEXT_PUBLIC_APP_URL from environment
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+
+  // If environment variables are set, use them
+  if (appUrl) {
+    return appUrl;
+  }
+
+  // In production, default to your custom domain
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    return "https://buildxpert.ie";
+  }
+
+  // In development, use localhost
+  return "http://localhost:3000";
+}
+
 export const sendVerificationEmail = async (to: string, token: string) => {
-  const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${token}`;
+  const appUrl = getAppUrl();
+  const verificationLink = `${appUrl}/verify-email?token=${token}`;
 
   try {
     const { subject, content } = await getProcessedTemplate(
@@ -113,7 +133,8 @@ export const sendVerificationEmail = async (to: string, token: string) => {
   } catch (error) {
     console.error("Error sending verification email:", error);
     // Fallback to hardcoded template if database template fails
-    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${token}`;
+    const appUrl = getAppUrl();
+    const verificationLink = `${appUrl}/verify-email?token=${token}`;
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
       <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
@@ -223,7 +244,8 @@ export const sendContactNotificationEmail = async (contactData: {
     contactData;
 
   try {
-    const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/contacts`;
+    const appUrl = getAppUrl();
+    const adminUrl = `${appUrl}/admin/contacts`;
     const { subject: emailSubject, content } = await getProcessedTemplate(
       "contact_notification",
       {
@@ -254,7 +276,8 @@ export const sendContactNotificationEmail = async (contactData: {
   } catch (error) {
     console.error("Error sending contact notification email:", error);
     // Fallback to hardcoded template if database template fails
-    const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/contacts`;
+    const appUrl = getAppUrl();
+    const adminUrl = `${appUrl}/admin/contacts`;
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">New Contact Form Submission</h2>
       <p>A new contact form has been submitted on the BuildXpert website.</p>
@@ -295,7 +318,8 @@ export const sendContactNotificationEmail = async (contactData: {
 };
 
 export const sendPasswordResetEmail = async (to: string, token: string) => {
-  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}`;
+  const appUrl = getAppUrl();
+  const resetLink = `${appUrl}/reset-password?token=${token}`;
 
   try {
     const { subject, content } = await getProcessedTemplate("password_reset", {
@@ -317,6 +341,8 @@ export const sendPasswordResetEmail = async (to: string, token: string) => {
   } catch (error) {
     console.error("Error sending password reset email:", error);
     // Fallback to hardcoded template if database template fails
+    const appUrl = getAppUrl();
+    const resetLink = `${appUrl}/reset-password?token=${token}`;
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
       <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>

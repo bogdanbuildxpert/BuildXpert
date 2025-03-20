@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "node simple-server.js",
     "dev:next": "next dev",
-    "build": "prisma generate && next build",
-    "postinstall": "prisma generate && node db/apply-triggers.js",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "vercel-build": "node prisma/prisma-vercel.js && prisma generate && next build",
+    "postinstall": "node prisma/prisma-vercel.js && prisma generate --no-engine && node db/apply-triggers.js",
     "start": "NODE_ENV=production node simple-server.js",
     "start:next": "next start",
     "restart": "taskkill /F /IM node.exe && npm run dev",

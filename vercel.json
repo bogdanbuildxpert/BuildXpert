@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run vercel-build",
   "installCommand": "npm install",
   "build": {
     "env": {
@@ -10,6 +10,8 @@
   },
   "env": {
     "PRISMA_CLIENT_ENGINE_TYPE": "binary",
-    "PRISMA_GENERATE_DATAPROXY": "false"
+    "PRISMA_GENERATE_DATAPROXY": "false",
+    "DATABASE_POSTGRES_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
+    "NODE_ENV": "production"
   }
 }

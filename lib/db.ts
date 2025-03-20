@@ -1,3 +1,7 @@
+// Import prisma setup first to ensure correct config
+import "./prisma-setup";
+// Import fix-prisma-protocol to fix the 'must start with protocol prisma://' error
+require("../scripts/fix-prisma-protocol");
 import { PrismaClient } from "@prisma/client";
 
 // Import runtime configuration

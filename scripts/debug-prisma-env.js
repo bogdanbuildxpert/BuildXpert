@@ -1,6 +1,9 @@
 // This script runs before build to check Prisma environment
 console.log("🔍 Checking Prisma environment before build...");
 
+// Force library engine type
+process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+
 // Load environment variables
 require("dotenv").config();
 
@@ -72,13 +75,15 @@ if (!directUrl) {
   }
 }
 
-// Set engine type for edge compatibility
-if (!process.env.PRISMA_CLIENT_ENGINE_TYPE) {
-  console.log(
-    "🔧 Setting PRISMA_CLIENT_ENGINE_TYPE to library for edge compatibility"
-  );
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
-}
+// Set engine type for edge compatibility - force to library always
+console.log(
+  "🔧 Setting PRISMA_CLIENT_ENGINE_TYPE to library for edge compatibility"
+);
+process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+
+// If PRISMA_GENERATE_DATAPROXY environment variable exists, set it to false
+process.env.PRISMA_GENERATE_DATAPROXY = "false";
+console.log("🔧 Setting PRISMA_GENERATE_DATAPROXY=false");
 
 // Log environment variables (masked for security)
 console.log("\n🔐 Environment Variables for Prisma:");

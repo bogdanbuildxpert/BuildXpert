@@ -19,13 +19,21 @@ console.log("VERCEL:", process.env.VERCEL);
 const connectionUrl =
   "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
 
+// Define Supabase URL (you should replace this with your actual Supabase URL)
+const supabaseUrl = "https://supabase.example.com";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example";
+
 // Force environment variables
 process.env.DATABASE_URL = connectionUrl;
 process.env.DIRECT_URL = connectionUrl;
+process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = supabaseAnonKey;
 
 // Create .env files with our variables
 const envContent = `DATABASE_URL=${connectionUrl}
-DIRECT_URL=${connectionUrl}`;
+DIRECT_URL=${connectionUrl}
+NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl}
+NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnonKey}`;
 
 try {
   // Write to .env

@@ -9,6 +9,11 @@
   },
   "env": {
     "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "DIRECT_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
+    "DIRECT_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
+    "POSTGRES_USER": "buildxpertuser",
+    "POSTGRES_PASSWORD": "Madalina123",
+    "POSTGRES_DB": "buildxpert",
+    "POSTGRES_HOST": "178.62.45.226",
+    "POSTGRES_PORT": "5432"
   }
 }

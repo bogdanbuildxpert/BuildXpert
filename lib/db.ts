@@ -34,18 +34,20 @@ console.log("[db.ts] Environment info:", {
 if (isStaticBuild) {
   console.log("[db.ts] Static build detected - using mock Prisma client only");
 
-  // Still set the correct protocol in case schema validation happens
-  if (databaseUrl.startsWith("postgresql://")) {
-    databaseUrl = "prisma://placeholder.prisma-data.com/?api_key=placeholder";
-    console.log(
-      "[db.ts] Using placeholder Prisma Accelerate URL for static build"
-    );
-  }
+  // Ensure we have a valid placeholder URL for static builds
+  // This is just to pass validation - we won't actually connect
+  databaseUrl =
+    "postgresql://placeholder:placeholder@placeholder:5432/placeholder";
+  console.log(
+    "[db.ts] Using placeholder PostgreSQL URL for static build (no actual connection)"
+  );
 }
 
 console.log(
-  "[db.ts] Database connection using URL protocol:",
-  databaseUrl.split(":")[0]
+  "[db.ts] Database connection using URL:",
+  databaseUrl.includes("@")
+    ? databaseUrl.split("@")[1]
+    : databaseUrl.split("://")[0]
 );
 
 // Create a mock Prisma client or use the real one - ALWAYS use mock for static builds

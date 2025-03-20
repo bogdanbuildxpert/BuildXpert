@@ -1,21 +1,50 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run vercel-build",
-  "installCommand": "npm install",
-  "build": {
-    "env": {
-      "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
+  "environmentVariables": [
+    {
+      "key": "POSTGRES_USER",
+      "value": "buildxpertuser"
+    },
+    {
+      "key": "POSTGRES_PASSWORD",
+      "value": "Madalina123"
+    },
+    {
+      "key": "POSTGRES_HOST",
+      "value": "178.62.45.226"
+    },
+    {
+      "key": "POSTGRES_PORT",
+      "value": "5432"
+    },
+    {
+      "key": "POSTGRES_DB",
+      "value": "buildxpert"
+    },
+    {
+      "key": "DATABASE_URL",
+      "value": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
+    },
+    {
+      "key": "DIRECT_URL",
+      "value": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
+    },
+    {
+      "key": "JWT_SECRET",
+      "value": "10c538c521860a7cbf0970eefb5d52a2309e80d0fd6b9aa24d3eb191723d2778"
+    },
+    {
+      "key": "NEXT_PUBLIC_APP_URL",
+      "value": "https://buildxpert.ie"
+    },
+    {
+      "key": "APP_URL",
+      "value": "https://buildxpert.ie"
+    },
+    {
+      "key": "PRISMA_CLIENT_ENGINE_TYPE",
+      "value": "library"
     }
-  },
-  "env": {
-    "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "DIRECT_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "POSTGRES_USER": "buildxpertuser",
-    "POSTGRES_PASSWORD": "Madalina123",
-    "POSTGRES_DB": "buildxpert",
-    "POSTGRES_HOST": "178.62.45.226",
-    "POSTGRES_PORT": "5432",
-    "NEXT_PUBLIC_APP_URL": "https://buildxpert.ie",
-    "APP_URL": "https://buildxpert.ie"
-  }
+  ]
 }

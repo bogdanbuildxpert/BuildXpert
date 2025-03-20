@@ -35,6 +35,12 @@ export async function GET() {
       }
     }
 
+    // Check the raw URL format to help diagnose issues
+    const rawDbUrl = process.env.DATABASE_URL || "";
+    const urlProtocol = rawDbUrl.includes("://")
+      ? rawDbUrl.split("://")[0]
+      : "none";
+
     // Get database connection info from environment variables
     const databaseInfo = {
       // Only show partial connection string for security
@@ -43,11 +49,15 @@ export async function GET() {
             process.env.DATABASE_URL.split("@")[1]?.split("/")[0] || "***"
           }/***`
         : "Not set",
+      urlProtocol: urlProtocol,
       directUrl: process.env.DIRECT_URL
         ? `${process.env.DIRECT_URL.split("://")[0]}://${
             process.env.DIRECT_URL.split("@")[1]?.split("/")[0] || "***"
           }/***`
         : "Not set",
+      directUrlProtocol: process.env.DIRECT_URL?.includes("://")
+        ? process.env.DIRECT_URL.split("://")[0]
+        : "none",
       postgresHost: process.env.POSTGRES_HOST || "Not set",
       postgresPort: process.env.POSTGRES_PORT || "Not set",
       postgresDb: process.env.POSTGRES_DB || "Not set",
@@ -72,6 +82,8 @@ export async function GET() {
         VERCEL_ENV: process.env.VERCEL_ENV || "Not set",
         VERCEL: process.env.VERCEL || "Not set",
         NEXT_PHASE: process.env.NEXT_PHASE || "Not set",
+        PRISMA_CLIENT_ENGINE_TYPE:
+          process.env.PRISMA_CLIENT_ENGINE_TYPE || "Not set",
       },
       timestamp: new Date().toISOString(),
     });
@@ -82,6 +94,12 @@ export async function GET() {
         status: "error",
         message: "Failed to test database connection",
         error: error instanceof Error ? error.message : String(error),
+        environment: {
+          DATABASE_URL: process.env.DATABASE_URL ? "Set (masked)" : "Not set",
+          DIRECT_URL: process.env.DIRECT_URL ? "Set (masked)" : "Not set",
+          NODE_ENV: process.env.NODE_ENV || "Not set",
+          VERCEL_ENV: process.env.VERCEL_ENV || "Not set",
+        },
       },
       { status: 500 }
     );

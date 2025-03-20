@@ -2,6 +2,21 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const dotenv = require("dotenv");
+
+// First, try to load existing environment variables
+try {
+  const envPath = path.join(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const envConfig = dotenv.parse(fs.readFileSync(envPath));
+    for (const k in envConfig) {
+      process.env[k] = envConfig[k];
+    }
+    console.log("Loaded environment variables from existing .env file");
+  }
+} catch (err) {
+  console.warn("Could not load existing .env file:", err.message);
+}
 
 console.log("=============== DEBUG PRISMA ENV ===============");
 console.log("NODE_ENV:", process.env.NODE_ENV);
@@ -14,26 +29,47 @@ console.log(
   process.env.DIRECT_URL ? "SET (masked for security)" : "NOT SET"
 );
 console.log("VERCEL:", process.env.VERCEL);
+console.log(
+  "SUPABASE URL:",
+  process.env.NEXT_PUBLIC_SUPABASE_URL ? "SET" : "NOT SET"
+);
+console.log(
+  "SUPABASE ANON KEY:",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ? "SET (masked for security)"
+    : "NOT SET"
+);
 
 // Define the connection URL
 const connectionUrl =
+  process.env.DATABASE_URL ||
   "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
 
-// Define Supabase URL (you should replace this with your actual Supabase URL)
-const supabaseUrl = "https://supabase.example.com";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example";
+// Define Supabase URL from environment or use a default
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://fuzejrthjgkpbgojgnew.supabase.co";
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1emVqcnRoamdrcGJnb2pnbmV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4ODY5MzYsImV4cCI6MjA1NzQ2MjkzNn0.paHLcO4PhxPTLkSUPABASE_SERVICE_ROLE_KEY";
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 // Force environment variables
 process.env.DATABASE_URL = connectionUrl;
 process.env.DIRECT_URL = connectionUrl;
 process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = supabaseAnonKey;
+if (serviceRoleKey) {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey;
+}
 
 // Create .env files with our variables
 const envContent = `DATABASE_URL=${connectionUrl}
 DIRECT_URL=${connectionUrl}
 NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl}
-NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnonKey}`;
+NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnonKey}${
+  serviceRoleKey ? `\nSUPABASE_SERVICE_ROLE_KEY=${serviceRoleKey}` : ""
+}`;
 
 try {
   // Write to .env

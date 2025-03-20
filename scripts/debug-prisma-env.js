@@ -1,6 +1,7 @@
 // Script to debug and fix Prisma environment issues
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 console.log("=============== DEBUG PRISMA ENV ===============");
 console.log("NODE_ENV:", process.env.NODE_ENV);
@@ -31,10 +32,17 @@ if (!process.env.DIRECT_URL) {
   console.log("Force set DIRECT_URL");
 }
 
-if (!process.env.PRISMA_CLIENT_ENGINE_TYPE) {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
-  console.log("Force set PRISMA_CLIENT_ENGINE_TYPE=binary");
-}
+// Explicitly set variables to disable data proxy
+process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
+console.log("Force set PRISMA_CLIENT_ENGINE_TYPE=binary");
+
+// Explicitly prevent data proxy
+process.env.PRISMA_GENERATE_DATAPROXY = "false";
+console.log("Force set PRISMA_GENERATE_DATAPROXY=false");
+
+// Remove any leftover data proxy variables
+delete process.env.PRISMA_DATA_PROXY_URL;
+console.log("Deleted PRISMA_DATA_PROXY_URL if it existed");
 
 // Path to the .env file for Next.js
 const envPath = path.join(process.cwd(), ".env");
@@ -45,11 +53,34 @@ try {
 DATABASE_URL=postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert
 DIRECT_URL=postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert
 PRISMA_CLIENT_ENGINE_TYPE=binary
+PRISMA_GENERATE_DATAPROXY=false
 `;
   fs.writeFileSync(envPath, envContent, "utf8");
   console.log("Created .env file with database connection variables");
 } catch (err) {
   console.error("Error creating .env file:", err);
+}
+
+// Create a .env.production file as well
+try {
+  fs.writeFileSync(
+    path.join(process.cwd(), ".env.production"),
+    envContent,
+    "utf8"
+  );
+  console.log("Created .env.production file with same variables");
+} catch (err) {
+  console.error("Error creating .env.production file:", err);
+}
+
+// Run native npm commands instead of relying on package.json scripts
+try {
+  console.log(
+    "Attempting to direct generate Prisma client with --no-engine flag"
+  );
+  execSync("npx prisma generate --no-engine", { stdio: "inherit" });
+} catch (err) {
+  console.error("Error manually generating Prisma client:", err);
 }
 
 // Load and write to prisma file if needed
@@ -65,6 +96,16 @@ try {
     );
     fs.writeFileSync(schemaPath, schema, "utf8");
     console.log("Updated schema.prisma to include directUrl");
+  }
+
+  // Remove any previewFeatures
+  if (schema.includes("previewFeatures")) {
+    schema = schema.replace(
+      /previewFeatures\s*=\s*\[[^\]]*\]/g,
+      "previewFeatures = []"
+    );
+    fs.writeFileSync(schemaPath, schema, "utf8");
+    console.log("Updated schema.prisma to have empty previewFeatures");
   }
 } catch (err) {
   console.error("Error updating schema.prisma:", err);

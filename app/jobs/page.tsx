@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { AdminJobList } from "@/components/AdminJobList";
 import { ClientJobList } from "@/components/ClientJobList";
@@ -17,6 +17,9 @@ export default function JobsPage() {
       router.push("/login?redirect=/jobs");
     }
   }, [user, isLoading, router]);
+
+  // Memoize the user ID to prevent unnecessary re-renders
+  const userId = useMemo(() => user?.id, [user?.id]);
 
   if (isLoading) {
     return (
@@ -61,7 +64,8 @@ export default function JobsPage() {
               <Briefcase className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-semibold">My Jobs</h2>
             </div>
-            <ClientJobList userId={user.id} />
+            {/* Only pass the memoized userId to avoid causing re-renders */}
+            {userId && <ClientJobList userId={userId} />}
           </div>
         )}
       </div>

@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Explicitly defined URL and key (for testing purposes)
-const SUPABASE_URL = "https://tmuzciprtqwpypvzwtye.supabase.co";
+// Direct Supabase connection for server-side
+const SUPABASE_URL = "https://tmuzclprtqwpypvzwtye.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 // Create client with explicit options
 export const supabaseDirect = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

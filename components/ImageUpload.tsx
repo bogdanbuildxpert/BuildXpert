@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { ImageIcon, X } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { ImageIcon, X, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import {
   compressImage,
@@ -26,14 +26,17 @@ export default function ImageUpload({
   path = "",
   className = "",
 }: ImageUploadProps) {
+  // Use refs to avoid rerenders during file uploads
+  const uploadingRef = useRef(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [images, setImages] = useState<
-    { file: File | null; preview: string; uploading: boolean }[]
+    { file: File | null; preview: string; uploading: boolean; error?: string }[]
   >([]);
 
-  // Initialize with initial image if provided
+  // Initialize with initial image if provided - only run once
   useEffect(() => {
-    if (initialImage) {
+    if (initialImage && images.length === 0) {
       setImages([{ file: null, preview: initialImage, uploading: false }]);
     }
 
@@ -45,40 +48,66 @@ export default function ImageUpload({
         }
       });
     };
-  }, [initialImage, images]);
+  }, [initialImage]); // Only depend on initialImage, not images
 
   const uploadToSupabase = useCallback(
     async (file: File, index: number) => {
       try {
+        // Clear any previous errors
+        setUploadError(null);
+
         // Update image state to show it's uploading
         setImages((prev) => {
           const updated = [...prev];
-          updated[index] = { ...updated[index], uploading: true };
+          if (index < updated.length) {
+            updated[index] = {
+              ...updated[index],
+              uploading: true,
+              error: undefined,
+            };
+          }
           return updated;
         });
 
+        // Determine which bucket to use based on the path or URL
+        // If the path contains 'job', use job-images bucket
+        const actualBucket =
+          path.includes("job") || window.location.pathname.includes("job")
+            ? "job-images"
+            : bucket;
+
         // Add detailed debug logs
-        console.log(`Uploading to bucket: ${bucket}, path: ${path || "root"}`);
         console.log(
-          `File: ${file.name}, size: ${(file.size / 1024).toFixed(2)}KB`
+          `Uploading to bucket: ${actualBucket}, path: ${path || "root"}`
+        );
+        console.log(
+          `File: ${file.name}, size: ${(file.size / 1024).toFixed(
+            2
+          )}KB, type: ${file.type}`
         );
 
-        const { url, error } = await uploadImage(file, bucket, path);
+        // Use server-side upload endpoint instead of direct Supabase upload
+        // to avoid token authentication issues
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("bucket", actualBucket);
+        formData.append("path", path);
 
-        if (error) {
-          console.error("Error uploading image:", error);
-          console.error("Error details:", JSON.stringify(error, null, 2));
-          toast.error(`Failed to upload ${file.name}`);
+        // Call our optimized API endpoint
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-          // Mark as not uploading anymore
-          setImages((prev) => {
-            const updated = [...prev];
-            updated[index] = { ...updated[index], uploading: false };
-            return updated;
-          });
-
-          return null;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `Upload failed with status ${response.status}`
+          );
         }
+
+        const data = await response.json();
+        const url = data.url;
 
         if (url) {
           console.log(`Upload successful. Image URL: ${url}`);
@@ -86,7 +115,14 @@ export default function ImageUpload({
           // Update the image in state
           setImages((prev) => {
             const updated = [...prev];
-            updated[index] = { file: null, preview: url, uploading: false };
+            if (index < updated.length) {
+              updated[index] = {
+                file: null,
+                preview: url,
+                uploading: false,
+                error: undefined,
+              };
+            }
             return updated;
           });
 
@@ -95,14 +131,26 @@ export default function ImageUpload({
           return url;
         }
 
-        return null;
+        throw new Error("No URL returned from upload");
       } catch (error) {
-        console.error("Error uploading to Supabase:", error);
+        console.error("Error uploading image:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Upload failed";
+
+        toast.error(`Failed to upload ${file.name}: ${errorMessage}`);
+
         setImages((prev) => {
           const updated = [...prev];
-          updated[index] = { ...updated[index], uploading: false };
+          if (index < updated.length) {
+            updated[index] = {
+              ...updated[index],
+              uploading: false,
+              error: errorMessage,
+            };
+          }
           return updated;
         });
+
         return null;
       }
     },
@@ -114,9 +162,11 @@ export default function ImageUpload({
       if (!e.target.files || e.target.files.length === 0) return;
 
       setIsUploading(true);
+      setUploadError(null);
 
       try {
         const files = Array.from(e.target.files);
+        console.log(`Processing ${files.length} file(s) for upload`);
 
         // Check if adding these files would exceed the maximum
         if (images.length + files.length > maxImages) {
@@ -128,6 +178,12 @@ export default function ImageUpload({
         // Process each selected file
         const newImagesPromises = files.map(async (file) => {
           try {
+            console.log(
+              `Processing file: ${file.name}, type: ${file.type}, size: ${(
+                file.size / 1024
+              ).toFixed(2)}KB`
+            );
+
             // Validate file size before compression
             if (file.size > 5 * 1024 * 1024) {
               toast.error(`${file.name} is too large. Maximum size is 5MB.`);
@@ -136,6 +192,9 @@ export default function ImageUpload({
 
             // Compress the image
             const compressedFile = await compressImage(file);
+            console.log(
+              `Compressed size: ${(compressedFile.size / 1024).toFixed(2)}KB`
+            );
 
             // Create a preview URL
             const preview = createImagePreview(compressedFile);
@@ -143,7 +202,9 @@ export default function ImageUpload({
             return { file: compressedFile, preview, uploading: true };
           } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
-            toast.error(`Failed to process ${file.name}`);
+            const errorMsg =
+              error instanceof Error ? error.message : "Unknown error";
+            toast.error(`Failed to process ${file.name}: ${errorMsg}`);
             return null;
           }
         });
@@ -156,22 +217,28 @@ export default function ImageUpload({
             result !== null
         );
 
+        console.log(`${validImages.length} file(s) ready for upload`);
+
         // Update state with new images
         const startIndex = images.length;
         setImages((prev) => [...prev, ...validImages]);
 
         // Automatically upload the new images
-        validImages.forEach((image, i) => {
-          if (image.file) {
-            uploadToSupabase(image.file, startIndex + i);
+        for (let i = 0; i < validImages.length; i++) {
+          if (validImages[i].file) {
+            console.log(`Starting upload for file ${i + 1}`);
+            await uploadToSupabase(validImages[i].file, startIndex + i);
           }
-        });
+        }
 
         // Reset the input value so the same file can be selected again
         e.target.value = "";
       } catch (error) {
         console.error("Error processing images:", error);
-        toast.error("Failed to process images");
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to process images";
+        setUploadError(errorMessage);
+        toast.error(`Failed to process images: ${errorMessage}`);
       } finally {
         setIsUploading(false);
       }
@@ -196,19 +263,41 @@ export default function ImageUpload({
     });
   }, []);
 
+  // Retry a failed upload
+  const retryUpload = useCallback(
+    (index: number) => {
+      const image = images[index];
+      if (image && image.file) {
+        uploadToSupabase(image.file, index);
+      }
+    },
+    [images, uploadToSupabase]
+  );
+
   return (
     <div className={`space-y-4 ${className}`}>
+      {uploadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center mb-4">
+          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+          <p className="text-sm">{uploadError}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-4">
         {images.map((image, index) => (
           <div
             key={index}
-            className="relative w-32 h-32 border rounded-md overflow-hidden group"
+            className={`relative w-32 h-32 border rounded-md overflow-hidden group ${
+              image.error ? "border-red-300" : ""
+            }`}
           >
             <Image
               src={image.preview}
               alt={`Preview ${index + 1}`}
               fill
-              className={`object-cover ${image.uploading ? "opacity-50" : ""}`}
+              className={`object-cover ${image.uploading ? "opacity-50" : ""} ${
+                image.error ? "opacity-30" : ""
+              }`}
             />
             {image.uploading && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -232,6 +321,17 @@ export default function ImageUpload({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
+              </div>
+            )}
+            {image.error && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-500 mb-1" />
+                <button
+                  onClick={() => retryUpload(index)}
+                  className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded"
+                >
+                  Retry
+                </button>
               </div>
             )}
             <button

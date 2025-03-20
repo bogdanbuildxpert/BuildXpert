@@ -48,8 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("user");
 
-    // Also clear the user cookie
-    document.cookie = "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    // Clear the user cookie with proper attributes
+    document.cookie =
+      "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict;";
 
     // Sign out from NextAuth
     signOut({ redirect: false });
@@ -168,23 +169,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: session.user.email as string,
         role: (session.user as any).role || "CLIENT",
       };
-      setUser(nextAuthUser);
 
-      // Also update localStorage for backward compatibility
-      localStorage.setItem("user", JSON.stringify(nextAuthUser));
+      // Only update if user is different to avoid unnecessary re-renders
+      if (!user || user.id !== nextAuthUser.id) {
+        console.log("Setting user from NextAuth session:", nextAuthUser);
+        setUser(nextAuthUser);
+
+        // Also update localStorage for backward compatibility
+        localStorage.setItem("user", JSON.stringify(nextAuthUser));
+
+        // Update the cookie as well
+        const userJson = JSON.stringify(nextAuthUser);
+        document.cookie = `user=${encodeURIComponent(
+          userJson
+        )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+      }
+    } else if (status === "unauthenticated" && user) {
+      // If NextAuth says we're not authenticated but we have a user, clear it
+      console.log("NextAuth reports unauthenticated, clearing user data");
+      setUser(null);
+      localStorage.removeItem("user");
+      document.cookie =
+        "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict;";
     }
 
+    // Always set loading state based on the session status
     setIsLoading(status === "loading");
-  }, [session, status]);
+  }, [session, status, user]);
 
   const login = (userData: User) => {
+    console.log("Setting user data in auth context:", userData);
     setUser(userData);
+
+    // Update local storage
     localStorage.setItem("user", JSON.stringify(userData));
 
-    // Also set the user in a cookie for server-side access
-    document.cookie = `user=${JSON.stringify(userData)}; path=/; max-age=${
-      60 * 60 * 24 * 7
-    }`; // 7 days
+    // Set the user in a cookie for server-side access with better security
+    const userJson = JSON.stringify(userData);
+    const cookieValue = `user=${encodeURIComponent(
+      userJson
+    )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+
+    console.log("Setting user cookie:", cookieValue.substring(0, 50) + "...");
+    document.cookie = cookieValue;
 
     // Reset inactivity timer on login
     resetInactivityTimer();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Edit, Trash2, Plus, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,10 @@ export function ClientJobList({ userId }: ClientJobListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
+  // Use useCallback to memoize the fetchJobs function to prevent dependency cycle
+  const fetchJobs = useCallback(async () => {
+    if (!userId) return;
+
     try {
       setIsLoading(true);
       const response = await fetch(`/api/jobs/user?userId=${userId}`);
@@ -67,13 +70,13 @@ export function ClientJobList({ userId }: ClientJobListProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId]); // Only depend on userId
 
+  // Run only once when component mounts
   useEffect(() => {
-    if (userId) {
-      fetchJobs();
-    }
-  }, [userId, fetchJobs]);
+    fetchJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]); // Only re-run if userId changes
 
   const handleDeleteJob = async () => {
     if (!jobToDelete) return;

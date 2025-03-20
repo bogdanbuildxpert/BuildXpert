@@ -1,50 +1,36 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Connection configuration
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
   relationMode = "foreignKeys"
 }
 
-// User model for authentication and user management
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String
-  emailVerified DateTime?
-  role          UserRole  @default(CLIENT)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  projects      Project[]
-  jobs          Job[]     @relation("AppliedJobs")
-  postedJobs    Job[]     @relation("JobPoster")
-  services      Service[] @relation("ServiceProvider")
-  reviews       Review[]  @relation("ReviewAuthor")
-  receivedReviews Review[] @relation("ReviewReceiver")
-  sentMessages  Message[] @relation("MessageSender")
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  password         String
+  role             UserRole  @default(CLIENT)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  emailVerified    DateTime?
+  postedJobs       Job[]     @relation("JobPoster")
   receivedMessages Message[] @relation("MessageReceiver")
+  sentMessages     Message[] @relation("MessageSender")
+  projects         Project[]
+  reviews          Review[]  @relation("ReviewAuthor")
+  receivedReviews  Review[]  @relation("ReviewReceiver")
+  services         Service[] @relation("ServiceProvider")
+  jobs             Job[]     @relation("AppliedJobs")
 
   @@index([role])
 }
 
-enum UserRole {
-  ADMIN
-  CLIENT
-}
-
-// Project model for construction/building projects
 model Project {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String
   budget      Float?
@@ -52,12 +38,135 @@ model Project {
   endDate     DateTime?
   status      ProjectStatus @default(PLANNING)
   location    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   clientId    String
-  client      User      @relation(fields: [clientId], references: [id])
-  tasks       Task[]
   materials   Material[]
+  client      User          @relation(fields: [clientId], references: [id])
+  tasks       Task[]
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  projectId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation(fields: [projectId], references: [id])
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  name      String
+  quantity  Float
+  unit      String
+  price     Float?
+  supplier  String?
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model Job {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  location    String?
+  posterId    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  metadata    Json?
+  status      ProjectStatus @default(PLANNING)
+  poster      User          @relation("JobPoster", fields: [posterId], references: [id])
+  messages    Message[]     @relation("JobMessages")
+  applicants  User[]        @relation("AppliedJobs")
+
+  @@index([posterId])
+  @@index([status])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float?
+  duration    String?
+  providerId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviews     Review[]
+  provider    User     @relation("ServiceProvider", fields: [providerId], references: [id])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  rating     Int      @default(0)
+  comment    String?
+  authorId   String
+  receiverId String
+  serviceId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  receiver   User     @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  service    Service? @relation(fields: [serviceId], references: [id])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  content    String
+  isRead     Boolean  @default(false)
+  senderId   String
+  receiverId String
+  jobId      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  job        Job      @relation("JobMessages", fields: [jobId], references: [id])
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id])
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([jobId])
+  @@index([senderId, receiverId])
+  @@index([createdAt])
+  @@index([isRead])
+}
+
+model Contact {
+  id               String        @id @default(cuid())
+  name             String
+  email            String
+  phone            String?
+  message          String
+  status           ContactStatus @default(NEW)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  preferredContact ContactMethod @default(EMAIL)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  subject     String
+  content     String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
 }
 
 enum ProjectStatus {
@@ -66,21 +175,6 @@ enum ProjectStatus {
   ON_HOLD
   COMPLETED
   CANCELLED
-}
-
-// Task model for project tasks
-model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  startDate   DateTime?
-  endDate     DateTime?
-  status      TaskStatus @default(TODO)
-  priority    Priority   @default(MEDIUM)
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 }
 
 enum TaskStatus {
@@ -97,109 +191,10 @@ enum Priority {
   URGENT
 }
 
-// Material model for tracking construction materials
-model Material {
-  id          String    @id @default(cuid())
-  name        String
-  quantity    Float
-  unit        String
-  price       Float?
-  supplier    String?
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-// Job model for job listings
-model Job {
-  id          String    @id @default(cuid())
-  title       String
-  description String
-  location    String?
-  status      ProjectStatus @default(PLANNING)
-  posterId    String
-  poster      User      @relation("JobPoster", fields: [posterId], references: [id])
-  applicants  User[]    @relation("AppliedJobs")
-  messages    Message[] @relation("JobMessages")
-  metadata    Json?     // Added metadata field to store additional job details
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([posterId])
-  @@index([status])
-}
-
-// Keep the JobStatus enum for backward compatibility with existing data
 enum JobStatus {
   OPEN
   CLOSED
   FILLED
-}
-
-// Service model for construction services
-model Service {
-  id          String    @id @default(cuid())
-  name        String
-  description String
-  price       Float?
-  duration    String?
-  providerId  String
-  provider    User      @relation("ServiceProvider", fields: [providerId], references: [id])
-  reviews     Review[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-// Review model for service and user reviews
-model Review {
-  id          String    @id @default(cuid())
-  rating      Int       @default(0)
-  comment     String?
-  authorId    String
-  author      User      @relation("ReviewAuthor", fields: [authorId], references: [id])
-  receiverId  String
-  receiver    User      @relation("ReviewReceiver", fields: [receiverId], references: [id])
-  serviceId   String?
-  service     Service?  @relation(fields: [serviceId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-// Message model for chat functionality
-model Message {
-  id          String    @id @default(cuid())
-  content     String
-  isRead      Boolean   @default(false)
-  senderId    String
-  sender      User      @relation("MessageSender", fields: [senderId], references: [id])
-  receiverId  String
-  receiver    User      @relation("MessageReceiver", fields: [receiverId], references: [id])
-  jobId       String
-  job         Job       @relation("JobMessages", fields: [jobId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([jobId])
-  @@index([senderId, receiverId])
-  @@index([createdAt])
-  @@index([isRead])
-}
-
-// Contact form submissions
-model Contact {
-  id              String        @id @default(cuid())
-  name            String
-  email           String
-  phone           String?
-  message         String
-  preferredContact ContactMethod @default(EMAIL)
-  status          ContactStatus @default(NEW)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  @@index([status])
-  @@index([createdAt])
 }
 
 enum ContactMethod {
@@ -212,17 +207,4 @@ enum ContactStatus {
   REVIEWED
   RESPONDED
   ARCHIVED
-}
-
-// Email templates for automated emails
-model EmailTemplate {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  subject     String
-  content     String    @db.Text
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([name])
 }

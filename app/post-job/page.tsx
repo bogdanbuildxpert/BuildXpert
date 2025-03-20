@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useSession, getCsrfToken, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,14 +70,29 @@ interface Job {
 export default function PostJobPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const {
+    data: session,
+    status: sessionStatus,
+    update: updateSession,
+  } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [activeAccordion, setActiveAccordion] = useState<string>("client-info");
+  const [currentSection, setCurrentSection] = useState(1);
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
+
+  // Add a ref to track form submission attempts
+  const submissionAttemptRef = useRef(0);
+  // Add a ref to track if component is mounted
+  const isMountedRef = useRef(true);
+
+  const [completedSections, setCompletedSections] = useState<Set<string>>(
+    new Set()
+  );
 
   const [formData, setFormData] = useState({
     // Client Information
@@ -108,6 +124,68 @@ export default function PostJobPage() {
     images: [] as string[],
   });
 
+  // Track component mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Enhanced auth check that ensures session is refreshed
+  useEffect(() => {
+    const checkAndRefreshAuth = async () => {
+      console.log("Auth status check:", {
+        authContextUser: !!user,
+        nextAuthSession: sessionStatus,
+        authLoading,
+      });
+
+      // Only redirect if we're confident the user is not authenticated
+      if (!authLoading && !user && sessionStatus === "unauthenticated") {
+        console.log("User not authenticated, redirecting to login");
+        router.push("/login?redirect=/post-job");
+      } else if (user || sessionStatus === "authenticated") {
+        // Only try to refresh once if needed, don't do it repeatedly
+        if (sessionStatus === "authenticated" && !formData.email) {
+          // Prefill email if available from authenticated user
+          if (user?.email) {
+            setFormData((prev) => ({
+              ...prev,
+              email: user.email,
+            }));
+          } else if (session?.user?.email) {
+            setFormData((prev) => ({
+              ...prev,
+              email: session.user.email as string,
+            }));
+          }
+        }
+      }
+    };
+
+    checkAndRefreshAuth();
+  }, [
+    user,
+    authLoading,
+    router,
+    sessionStatus,
+    session?.user?.email,
+    formData.email,
+  ]);
+
+  // Add keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && e.ctrlKey && !isLastSection()) {
+        handleNextSection();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [activeAccordion]);
+
   // Map fields to their accordion sections
   const fieldToAccordionMap: Record<string, string> = {
     email: "client-info",
@@ -120,7 +198,7 @@ export default function PostJobPage() {
     estimatedArea: "project-scope",
   };
 
-  // Add this array of accordion sections in order
+  // Array of accordion sections in order
   const accordionSections = [
     "client-info",
     "job-details",
@@ -131,12 +209,7 @@ export default function PostJobPage() {
     "additional-notes",
   ];
 
-  // Add progress tracking
-  const [completedSections, setCompletedSections] = useState<Set<string>>(
-    new Set()
-  );
-
-  // Add function to check section completion
+  // Add function to check section completion - declare before it's used
   const isSectionComplete = (section: string) => {
     switch (section) {
       case "client-info":
@@ -152,6 +225,11 @@ export default function PostJobPage() {
     }
   };
 
+  // Add function to check if it's the last section - declare before it's used
+  const isLastSection = () => {
+    return activeAccordion === accordionSections[accordionSections.length - 1];
+  };
+
   // Update handleNextSection to include completion tracking
   const handleNextSection = () => {
     const currentIndex = accordionSections.indexOf(activeAccordion);
@@ -163,30 +241,6 @@ export default function PostJobPage() {
       setActiveAccordion(accordionSections[currentIndex + 1]);
     }
   };
-
-  // Add keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && e.ctrlKey && !isLastSection()) {
-        handleNextSection();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [activeAccordion]);
-
-  // Redirect to login if user is not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login?redirect=/post-job");
-    }
-  }, [user, authLoading, router]);
-
-  // Don't render anything if user is not authenticated (prevents flash of content before redirect)
-  if (!user) {
-    return null;
-  }
 
   // Clear validation error when a field is updated
   const clearValidationError = (field: string) => {
@@ -246,6 +300,32 @@ export default function PostJobPage() {
     clearValidationError(field);
   };
 
+  // Function to handle image upload from the ImageUpload component
+  const handleImageUploaded = (imageUrl: string) => {
+    if (!isMountedRef.current) return;
+
+    setImages((prev) => [...prev, imageUrl]);
+
+    // Update form data with new image URL
+    setFormData((prev) => ({
+      ...prev,
+      images: [...prev.images, imageUrl],
+    }));
+  };
+
+  // Function to clear a date
+  const clearDate = (dateType: "start" | "end") => {
+    if (dateType === "start") {
+      setStartDate(undefined);
+      // If start date is cleared and end date is before current date, also clear end date
+      if (endDate && endDate < new Date()) {
+        setEndDate(undefined);
+      }
+    } else {
+      setEndDate(undefined);
+    }
+  };
+
   // Validate all required fields regardless of visibility
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -287,30 +367,33 @@ export default function PostJobPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const [currentSection, setCurrentSection] = useState(1);
-
-  // Function to handle image upload from the ImageUpload component
-  const handleImageUploaded = (imageUrl: string) => {
-    setImages((prev) => [...prev, imageUrl]);
-
-    // Update form data with new image URL
-    setFormData((prev) => ({
-      ...prev,
-      images: [...prev.images, imageUrl],
-    }));
+  const generateJobDescription = () => {
+    return `
+Posted by: ${user?.name || user?.email || "Anonymous"}
+Property Type: ${formData.propertyType}
+Location: ${formData.jobLocation}
+Areas to be Painted: ${formData.paintingAreas.join(", ")}
+Surface Condition: ${formData.surfaceCondition}
+Paint Type: ${formData.paintType}
+Color Preferences: ${formData.colorPreferences}
+Special Finishes: ${formData.specialFinishes}
+Estimated Area: ${formData.estimatedArea}
+Timeline: ${startDate ? format(startDate, "PPP") : "Not specified"} to ${
+      endDate ? format(endDate, "PPP") : "Not specified"
+    }
+Additional Requirements: ${
+      formData.furnitureMoving ? "Furniture moving/protection needed. " : ""
+    }${formData.scaffolding ? "Scaffolding required. " : ""}
+Additional Notes: ${formData.additionalNotes}
+    `.trim();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
-      toast.error("You must be logged in to post a job");
-      router.push("/login?from=/post-job");
-      return;
-    }
-
     // Validate all fields before submission
     if (!validateForm()) {
+      toast.error("Please fill in all required fields correctly");
       return;
     }
 
@@ -333,73 +416,74 @@ export default function PostJobPage() {
           furnitureMoving: formData.furnitureMoving,
           scaffolding: formData.scaffolding,
           additionalNotes: formData.additionalNotes,
+          // Include all images, no need to filter placeholder images anymore
           images: formData.images,
+          startDate: startDate ? startDate.toISOString() : null,
+          endDate: endDate ? endDate.toISOString() : null,
+          submissionAttempt: submissionAttemptRef.current, // Add attempt count to track duplicate submissions
         },
       };
+
+      console.log("Submitting job data:", jobData);
+      console.log(
+        "Auth status:",
+        user ? "Authenticated" : "Not authenticated",
+        "Session status:",
+        sessionStatus
+      );
+
+      // Get the CSRF token from NextAuth
+      const csrfToken = await getCsrfToken();
+      console.log("CSRF token present:", csrfToken ? "Yes" : "No");
 
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // Include CSRF token if available
+          ...(csrfToken && { "csrf-token": csrfToken }),
         },
         body: JSON.stringify(jobData),
         credentials: "include", // Include cookies in the request
       });
 
+      console.log("Response status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("API error response:", errorData);
+
         if (response.status === 401) {
           // Unauthorized - redirect to login
           toast.error("Your session has expired. Please log in again.");
-          router.push("/login?from=/post-job");
+          router.push("/login?redirect=/post-job");
           return;
         }
-        throw new Error(errorData.error || "Failed to post job");
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
-      toast.success("Job posted successfully");
-      router.push("/jobs");
+      const responseData = await response.json();
+      console.log("Job posted successfully:", responseData);
+
+      // Only continue if component is still mounted
+      if (isMountedRef.current) {
+        toast.success("Job posted successfully");
+        router.push("/jobs");
+      }
     } catch (error) {
       console.error("Error posting job:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to post job"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const generateJobDescription = () => {
-    return `
-Posted by: ${user?.name || user?.email || "Anonymous"}
-Property Type: ${formData.propertyType}
-Location: ${formData.jobLocation}
-Areas to be Painted: ${formData.paintingAreas.join(", ")}
-Surface Condition: ${formData.surfaceCondition}
-Paint Type: ${formData.paintType}
-Color Preferences: ${formData.colorPreferences}
-Special Finishes: ${formData.specialFinishes}
-Estimated Area: ${formData.estimatedArea}
-Timeline: ${startDate ? format(startDate, "PPP") : "Not specified"} to ${
-      endDate ? format(endDate, "PPP") : "Not specified"
-    }
-Additional Requirements: ${
-      formData.furnitureMoving ? "Furniture moving/protection needed. " : ""
-    }${formData.scaffolding ? "Scaffolding required. " : ""}
-Additional Notes: ${formData.additionalNotes}
-    `.trim();
-  };
-
-  // Function to clear a date
-  const clearDate = (dateType: "start" | "end") => {
-    if (dateType === "start") {
-      setStartDate(undefined);
-      // If start date is cleared and end date is before current date, also clear end date
-      if (endDate && endDate < new Date()) {
-        setEndDate(undefined);
+      // Only show error if component is still mounted
+      if (isMountedRef.current) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to post job"
+        );
       }
-    } else {
-      setEndDate(undefined);
+    } finally {
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -451,17 +535,25 @@ Additional Notes: ${formData.additionalNotes}
     );
   };
 
-  // Add function to check if it's the last section
-  const isLastSection = () => {
-    return activeAccordion === accordionSections[accordionSections.length - 1];
-  };
-
   if (authLoading) {
     return (
       <div className="container max-w-3xl py-16 md:py-24 flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if user is not authenticated (prevents flash of content before redirect)
+  if (!user) {
+    return (
+      <div className="container max-w-3xl py-16 md:py-24 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p>You must be logged in to post a job.</p>
+          <p>Redirecting to login page...</p>
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       </div>
     );

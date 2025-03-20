@@ -1,79 +1,92 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Type for bucket file results
+interface BucketResult {
+  error?: string;
+  count?: number;
+  files?: string[];
+}
+
+// Test endpoint for Supabase storage access (service role)
 export async function GET() {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    // Create a Supabase client with service role key
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+      {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: {
+          headers: {
+            // Use the service role key for both auth header and apikey
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+            Authorization: `Bearer ${
+              process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+            }`,
+          },
+        },
+      }
+    );
 
-    // Create client
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log("Testing Supabase bucket access with service role key...");
 
-    // Test basic bucket operations
-    console.log("Testing app-images bucket operations...");
+    // List all buckets using service role for maximum permissions
+    const { data: buckets, error: bucketsError } =
+      await supabase.storage.listBuckets();
 
-    // 1. List all files in bucket
-    console.log("Listing files in bucket...");
-    const { data: listData, error: listError } = await supabase.storage
-      .from("app-images")
-      .list();
-
-    if (listError) {
-      console.error("Error listing bucket contents:", listError);
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
       return NextResponse.json(
         {
           success: false,
-          error: listError,
-          operation: "list",
-          message: "Failed to list bucket contents",
+          error: `Failed to list buckets: ${bucketsError.message}`,
+          url: process.env.NEXT_PUBLIC_SUPABASE_URL,
         },
         { status: 500 }
       );
     }
 
-    // 2. Try to upload a simple test file
-    console.log("Creating test file...");
-    const testFile = new Blob(["test content"], { type: "text/plain" });
-    const testFileName = `test-${Date.now()}.txt`;
+    // Check if we have the expected buckets
+    const expectedBuckets = ["app-images", "job-images"];
+    const foundBuckets = buckets.map((b) => b.name);
+    const allBucketsFound = expectedBuckets.every((b) =>
+      foundBuckets.includes(b)
+    );
 
-    console.log(`Uploading ${testFileName} to app-images...`);
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("app-images")
-      .upload(testFileName, testFile);
+    // Try to list files in both buckets
+    const results: Record<string, BucketResult> = {};
 
-    if (uploadError) {
-      console.error("Error uploading file:", uploadError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: uploadError,
-          operation: "upload",
-          message: "Failed to upload test file",
-          listData, // Return list results even if upload failed
-        },
-        { status: 500 }
-      );
+    for (const bucket of foundBuckets) {
+      const { data: files, error: filesError } = await supabase.storage
+        .from(bucket)
+        .list();
+
+      if (filesError) {
+        results[bucket] = { error: filesError.message };
+      } else {
+        results[bucket] = {
+          count: files.length,
+          files: files.map((f) => f.name).slice(0, 5), // Limit to first 5 files
+        };
+      }
     }
-
-    // 3. Get a public URL for the file
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("app-images").getPublicUrl(testFileName);
 
     return NextResponse.json({
       success: true,
-      message: "Successfully tested bucket operations",
-      listResults: listData,
-      uploadResult: uploadData,
-      publicUrl,
+      buckets: foundBuckets,
+      allExpectedBucketsFound: allBucketsFound,
+      expectedBuckets,
+      bucketDetails: results,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     });
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("Error testing bucket access:", error);
     return NextResponse.json(
       {
         success: false,
-        error: JSON.stringify(error),
-        message: "An unexpected error occurred",
+        error: error instanceof Error ? error.message : "Unknown error",
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
       },
       { status: 500 }
     );

@@ -10,14 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { Separator } from "@/components/ui/separator";
 
 // Extract the inner content that uses useSearchParams
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, user } = useAuth();
+  const auth = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [loginData, setLoginData] = useState({
@@ -36,12 +36,15 @@ function LoginPageContent() {
   const redirectUrl =
     searchParams.get("redirect") || searchParams.get("from") || "/";
 
-  // Redirect if already logged in
+  // Remove the redundant redirection code since middleware handles it now
+  // Just keep a log message for debugging
   useEffect(() => {
-    if (user) {
-      router.push(redirectUrl);
+    if (auth.user) {
+      console.log(
+        "User is already logged in, middleware will handle redirect to appropriate page"
+      );
     }
-  }, [user, router, redirectUrl]);
+  }, [auth.user]);
 
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -65,24 +68,66 @@ function LoginPageContent() {
     setIsLoading(true);
 
     try {
-      // Use NextAuth's signIn function instead of direct API call
+      console.log("Starting login process with credentials:", {
+        email: loginData.email,
+        passwordLength: loginData.password.length,
+        redirect: redirectUrl,
+      });
+
+      // Use NextAuth's signIn function with enhanced error handling
       const result = await signIn("credentials", {
         redirect: false,
         email: loginData.email,
         password: loginData.password,
       });
 
+      console.log("Sign in result:", result);
+
       if (result?.error) {
         throw new Error(result.error || "Failed to login");
       }
 
-      toast.success("Login successful!");
+      if (!result?.ok) {
+        throw new Error("Login failed - please try again");
+      }
 
-      // Redirect to the original URL or home page after a short delay to allow state updates
+      toast.success("Login successful!");
+      console.log("Login successful, redirecting to:", redirectUrl);
+
+      // Force a session update before redirecting
+      const session = await getSession();
+      console.log("Updated session:", session);
+
+      // If we have a valid session now, also update the auth context
+      if (session?.user) {
+        const userData = {
+          id: session.user.id as string,
+          name: session.user.name || null,
+          email: session.user.email as string,
+          role: (session.user as any).role || "CLIENT",
+        };
+
+        console.log("Setting user data in auth context:", userData);
+        auth.login(userData);
+
+        // Also store in localStorage and cookie for better persistence
+        localStorage.setItem("user", JSON.stringify(userData));
+        document.cookie = `user=${encodeURIComponent(
+          JSON.stringify(userData)
+        )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+      }
+
+      // Small delay to ensure auth state is fully updated
       setTimeout(() => {
-        router.push(redirectUrl);
-        router.refresh();
-      }, 500);
+        // Use router push for client-side navigation when appropriate
+        if (redirectUrl.startsWith("/")) {
+          // For internal routes, use the router
+          router.push(redirectUrl);
+        } else {
+          // For external URLs, use window.location
+          window.location.href = redirectUrl;
+        }
+      }, 100);
     } catch (error) {
       console.error("Login error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to login");
@@ -184,11 +229,14 @@ function LoginPageContent() {
   const handleGoogleSignIn = async () => {
     try {
       setGoogleLoading(true);
-      await signIn("google", { callbackUrl: redirectUrl });
+      // Use callbackUrl directly in signIn for Google OAuth
+      await signIn("google", {
+        callbackUrl: redirectUrl,
+        redirect: true, // Force redirect
+      });
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast.error("Failed to sign in with Google");
-    } finally {
       setGoogleLoading(false);
     }
   };
@@ -272,12 +320,18 @@ function LoginPageContent() {
 
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <TabsTrigger
-                value="register"
+              <button
+                type="button"
+                onClick={() => {
+                  const registerTab = document.querySelector(
+                    '[value="register"]'
+                  ) as HTMLElement;
+                  if (registerTab) registerTab.click();
+                }}
                 className="text-primary underline underline-offset-4 hover:text-primary/90 p-0 m-0 h-auto bg-transparent"
               >
                 Sign up
-              </TabsTrigger>
+              </button>
             </p>
           </TabsContent>
 

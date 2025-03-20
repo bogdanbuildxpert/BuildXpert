@@ -38,7 +38,7 @@ const nextConfig = {
     parallelServerCompiles: true,
   },
   // Vercel-specific configuration
-  output: "standalone",
+  // output: "standalone", // Commented out to work with PM2
   distDir: ".next",
   poweredByHeader: false,
 };

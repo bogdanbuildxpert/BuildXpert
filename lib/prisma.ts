@@ -9,71 +9,38 @@ declare global {
 
 // Check if we're in a Vercel preview environment
 const isVercelPreview = process.env.VERCEL_ENV === "preview";
-const isVercelProduction =
-  process.env.VERCEL === "1" && process.env.NODE_ENV === "production";
-const isDataProxyEnabled =
-  process.env.PRISMA_CLIENT_ENGINE_TYPE === "dataproxy";
 
 // Log environment information
 console.log(
   `[prisma.ts] Environment: ${
-    isVercelProduction
-      ? "Vercel Production"
-      : isVercelPreview
-      ? "Vercel Preview"
-      : "Development/Other"
+    isVercelPreview ? "Vercel Preview" : "Production or Development"
   }`
 );
-console.log(
-  `[prisma.ts] Engine type: ${isDataProxyEnabled ? "dataproxy" : "library"}`
-);
+console.log(`[prisma.ts] Engine type: library (direct connections)`);
 
 // Create Prisma client with options
 function createPrismaClient() {
   try {
-    // If in preview environment, we can optionally create a dummy client
-    if (isVercelPreview) {
-      console.log(
-        "[prisma.ts] Creating mock Prisma client for preview environment"
-      );
-
-      // For preview deployments, we'll create a real client but many operations will be no-ops
-      // This allows the app to build and deploy but prevents database changes
-      const previewPrisma = new PrismaClient({
-        log: ["error"] as Prisma.LogLevel[],
-        datasources: {
-          db: {
-            url: process.env.DATABASE_URL,
-          },
-        },
-      });
-
-      return previewPrisma;
-    }
-
-    // Use appropriate log levels based on environment
-    const logLevels: Prisma.LogLevel[] =
-      process.env.NODE_ENV === "development"
+    // Configure connection options for direct connections
+    const connectionOptions = {
+      log: (process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
-        : ["error"];
+        : ["error"]) as Prisma.LogLevel[],
+    };
 
-    // Create a new PrismaClient with connection pooling appropriate for serverless
-    const prisma = new PrismaClient({
-      log: logLevels,
-      // Only include datasources for library engine type (not needed for dataproxy)
-      ...(isDataProxyEnabled
-        ? {}
-        : {
-            datasources: {
-              db: {
-                url: process.env.DATABASE_URL,
-              },
-            },
-          }),
-    });
+    // Create Prisma client with connection pooling for serverless
+    console.log(
+      "[prisma.ts] Creating PrismaClient with direct database connection"
+    );
+    const prisma = new PrismaClient(connectionOptions);
 
-    // Apply additional serverless optimization for connection reuse
-    prisma.$connect();
+    // Connect to validate the connection works
+    prisma
+      .$connect()
+      .then(() => console.log("[prisma.ts] Successfully connected to database"))
+      .catch((err) =>
+        console.error("[prisma.ts] Failed to connect to database:", err)
+      );
 
     return prisma;
   } catch (error) {

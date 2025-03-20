@@ -1,25 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "env": {
-    "POSTGRES_USER": "buildxpertuser",
-    "POSTGRES_PASSWORD": "Madalina123",
-    "POSTGRES_HOST": "178.62.45.226",
-    "POSTGRES_PORT": "5432",
-    "POSTGRES_DB": "buildxpert",
-    "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "DIRECT_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "JWT_SECRET": "10c538c521860a7cbf0970eefb5d52a2309e80d0fd6b9aa24d3eb191723d2778",
-    "NEXT_PUBLIC_APP_URL": "https://buildxpert.ie",
-    "APP_URL": "https://buildxpert.ie",
-    "PRISMA_CLIENT_ENGINE_TYPE": "library"
-  },
-  "build": {
-    "env": {
-      "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-      "PRISMA_CLIENT_ENGINE_TYPE": "library"
-    }
-  }
+  "buildCommand": "npm run vercel-build"
 }

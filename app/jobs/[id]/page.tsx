@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, MapPin, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { SimpleJobChat } from "@/components/SimpleJobChat";
 import {
   Select,
   SelectContent,
@@ -469,8 +468,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
             </div>
-
-            {/* Chat Component removed - feature temporarily disabled */}
           </div>
         </div>
       </div>

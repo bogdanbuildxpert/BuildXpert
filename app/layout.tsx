@@ -5,7 +5,6 @@ import "./globals.css";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { AuthProvider } from "@/lib/auth-context";
-import { NotificationsProvider } from "@/lib/notifications-context";
 import { Toaster } from "sonner";
 import { Providers } from "./providers";
 import dynamic from "next/dynamic";
@@ -155,15 +154,13 @@ export default function RootLayout({
 
         <Providers>
           <AuthProvider>
-            <NotificationsProvider>
-              <Toaster position="top-right" />
-              <div className="flex min-h-screen flex-col">
-                <Navigation />
-                <main className="flex-1">{children}</main>
-                <Footer />
-              </div>
-              <InactivityMonitor />
-            </NotificationsProvider>
+            <Toaster position="top-right" />
+            <div className="flex min-h-screen flex-col">
+              <Navigation />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+            <InactivityMonitor />
           </AuthProvider>
         </Providers>
       </body>

@@ -20,8 +20,6 @@ model User {
   updatedAt        DateTime  @updatedAt
   emailVerified    DateTime?
   postedJobs       Job[]     @relation("JobPoster")
-  receivedMessages Message[] @relation("MessageReceiver")
-  sentMessages     Message[] @relation("MessageSender")
   projects         Project[]
   reviews          Review[]  @relation("ReviewAuthor")
   receivedReviews  Review[]  @relation("ReviewReceiver")
@@ -86,7 +84,6 @@ model Job {
   metadata    Json?
   status      ProjectStatus @default(PLANNING)
   poster      User          @relation("JobPoster", fields: [posterId], references: [id])
-  messages    Message[]     @relation("JobMessages")
   applicants  User[]        @relation("AppliedJobs")
 
   @@index([posterId])
@@ -118,25 +115,6 @@ model Review {
   author     User     @relation("ReviewAuthor", fields: [authorId], references: [id])
   receiver   User     @relation("ReviewReceiver", fields: [receiverId], references: [id])
   service    Service? @relation(fields: [serviceId], references: [id])
-}
-
-model Message {
-  id         String   @id @default(cuid())
-  content    String
-  isRead     Boolean  @default(false)
-  senderId   String
-  receiverId String
-  jobId      String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  job        Job      @relation("JobMessages", fields: [jobId], references: [id])
-  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id])
-  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
-
-  @@index([jobId])
-  @@index([senderId, receiverId])
-  @@index([createdAt])
-  @@index([isRead])
 }
 
 model Contact {

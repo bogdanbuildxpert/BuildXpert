@@ -16,7 +16,6 @@ import {
   Bell,
   Calendar,
   Home,
-  MessageSquare,
   Settings,
   Users,
   Mail,
@@ -105,15 +104,6 @@ export default function AdminDashboardPage() {
             <Link href="/admin/users" className="flex items-center space-x-2">
               <Users className="h-5 w-5" />
               <span>Users</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" className="justify-start" asChild>
-            <Link
-              href="/admin/messages"
-              className="flex items-center space-x-2"
-            >
-              <MessageSquare className="h-5 w-5" />
-              <span>Messages</span>
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>

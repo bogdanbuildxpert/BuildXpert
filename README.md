@@ -21,6 +21,7 @@ BuildXpert is a comprehensive platform for construction painting professionals a
 - **Authentication**: NextAuth.js
 - **Email**: Nodemailer
 - **Deployment**: Vercel (recommended)
+- **Storage**: Supabase
 
 ## Getting Started
 
@@ -50,25 +51,35 @@ BuildXpert is a comprehensive platform for construction painting professionals a
    ```
    # PostgreSQL Connection String
    DATABASE_URL="postgresql://username:password@localhost:5432/buildxpert?schema=public"
+   DIRECT_URL="postgresql://username:password@localhost:5432/buildxpert?schema=public"
 
    # App URL
    NEXT_PUBLIC_APP_URL="http://localhost:3000"
+   APP_URL="http://localhost:3000"
 
    # JWT Secret for Authentication
    JWT_SECRET="your-secret-key"
 
    # Email configuration
-   EMAIL_USER="your-email@gmail.com"
-   EMAIL_PASSWORD="your-app-specific-password"
+   EMAIL_SERVER_HOST="smtp.example.com"
+   EMAIL_SERVER_PORT=587
+   EMAIL_SERVER_USER="your-email@example.com"
+   EMAIL_SERVER_PASSWORD="your-password"
+   EMAIL_FROM_NAME="BuildXpert"
 
-   # NextAuth
-   NEXTAUTH_SECRET="your-nextauth-secret"
-   NEXTAUTH_URL="http://localhost:3000"
+   # Supabase Storage
+   NEXT_PUBLIC_SUPABASE_URL="your-supabase-url"
+   NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
+   SUPABASE_SERVICE_ROLE_KEY="your-supabase-service-role-key"
+
+   # Prisma settings
+   PRISMA_CLIENT_ENGINE_TYPE="library"
    ```
 
 4. Set up the database:
 
    ```bash
+   npx prisma generate
    npx prisma migrate dev
    ```
 
@@ -79,6 +90,36 @@ BuildXpert is a comprehensive platform for construction painting professionals a
    ```
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Deployment
+
+### Vercel Deployment
+
+The recommended way to deploy BuildXpert is with Vercel:
+
+1. Push your code to a GitHub repository
+2. Import the project into Vercel
+3. Set the environment variables in the Vercel dashboard
+4. Deploy your project
+
+### Database Troubleshooting
+
+If you encounter database connection issues:
+
+1. Check your connection string format:
+
+   - Make sure it starts with `postgresql://` and not `prisma://`
+   - Format should be `postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE`
+
+2. Testing database connectivity:
+
+   - Visit `/api/auth/test-db` endpoint to check database connection
+   - Run `npm run check-db` locally to test direct connectivity
+
+3. Common issues:
+   - Firewall blocking connections to your database
+   - Incorrect credentials in environment variables
+   - Database server not allowing remote connections
 
 ## Setting Up Supabase for Image Storage
 
@@ -110,6 +151,7 @@ The application will automatically handle image compression before uploading and
 - `/lib`: Utility functions and shared code
 - `/prisma`: Database schema and migrations
 - `/public`: Static assets
+- `/scripts`: Utility scripts for database and deployment
 
 ## Contributing
 

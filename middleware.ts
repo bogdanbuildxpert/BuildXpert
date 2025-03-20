@@ -29,28 +29,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Block problematic API endpoints
-  if (
-    path === "/api/messages/unread" ||
-    path === "/api/messages/notifications"
-  ) {
-    // Return a cached empty response directly from middleware
-    return new Response(
-      JSON.stringify({
-        _blocked: "middleware",
-        _note: "This endpoint is disabled. Use Socket.IO instead.",
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=86400, s-maxage=86400",
-        },
-      }
-    );
-  }
-
   // Check for user cookie as a fallback for authentication
   const userCookie = request.cookies.get("user");
   let cookieUser = null;
@@ -141,8 +119,7 @@ export async function middleware(request: NextRequest) {
   const isAdminProtectedRoute =
     path.startsWith("/projects") ||
     path.startsWith("/admin/dashboard") ||
-    path.startsWith("/admin/contacts") ||
-    path.startsWith("/admin/messages");
+    path.startsWith("/admin/contacts");
 
   // Define routes that require authentication (any user)
   const isAuthProtectedRoute =
@@ -189,9 +166,6 @@ export const config = {
     "/post-job/:path*",
     "/admin/dashboard/:path*",
     "/admin/contacts/:path*",
-    "/admin/messages/:path*",
-    "/api/messages/unread",
-    "/api/messages/notifications",
     "/login", // Add login page to middleware
     "/register", // Add register page to middleware
     "/admin/login", // Add admin login page to middleware

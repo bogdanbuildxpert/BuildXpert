@@ -1,6 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "library"
+  // Add a pregenerate hook to run our fixUrl script
+  previewFeatures = ["driverAdapters"]
+  binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
+  // This ensures the hook runs on all environments including Vercel
+  hooks = {
+    pregenerate = "node ./pregenerate.js"
+  }
 }
 
 datasource db {

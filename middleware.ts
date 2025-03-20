@@ -3,6 +3,10 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(request: NextRequest) {
+  // Fix Prisma URL protocols for all requests
+  // This runs at the beginning of each request, ensuring proper URLs
+  fixPrismaUrls();
+
   // Get the pathname of the request for debugging
   const path = request.nextUrl.pathname;
   console.log(`Middleware processing request for: ${path}`);
@@ -157,17 +161,45 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configure the middleware to run on the appropriate paths
+// See "Matching Paths" below to learn more
 export const config = {
   matcher: [
-    "/projects/:path*",
-    "/jobs/edit/:path*",
-    "/post-job",
-    "/post-job/:path*",
-    "/admin/dashboard/:path*",
-    "/admin/contacts/:path*",
-    "/login", // Add login page to middleware
-    "/register", // Add register page to middleware
-    "/admin/login", // Add admin login page to middleware
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
+
+function fixPrismaUrls() {
+  // Only run this in production environments
+  if (process.env.NODE_ENV !== "production") return;
+
+  // Force library engine type
+  if (process.env.PRISMA_CLIENT_ENGINE_TYPE !== "library") {
+    process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+    console.log("[middleware] Fixed PRISMA_CLIENT_ENGINE_TYPE to library");
+  }
+
+  // Fix DATABASE_URL if needed
+  if (process.env.DATABASE_URL?.startsWith("prisma://")) {
+    process.env.DATABASE_URL =
+      "postgresql://" + process.env.DATABASE_URL.substring(9);
+    console.log(
+      "[middleware] Fixed DATABASE_URL protocol from prisma:// to postgresql://"
+    );
+  }
+
+  // Fix DIRECT_URL if needed
+  if (process.env.DIRECT_URL?.startsWith("prisma://")) {
+    process.env.DIRECT_URL =
+      "postgresql://" + process.env.DIRECT_URL.substring(9);
+    console.log(
+      "[middleware] Fixed DIRECT_URL protocol from prisma:// to postgresql://"
+    );
+  }
+}

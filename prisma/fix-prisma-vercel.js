@@ -15,6 +15,14 @@ function fixPrismaVercel() {
   process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
   console.log('[fix-prisma-vercel] Set engine type to "library"');
 
+  // Set connection pooling configuration
+  process.env.DATABASE_CONNECTION_LIMIT =
+    process.env.DATABASE_CONNECTION_LIMIT || "5";
+  process.env.DATABASE_POOL_TIMEOUT = process.env.DATABASE_POOL_TIMEOUT || "15";
+  console.log(
+    `[fix-prisma-vercel] Set connection pool limits: limit=${process.env.DATABASE_CONNECTION_LIMIT}, timeout=${process.env.DATABASE_POOL_TIMEOUT}`
+  );
+
   // Check DATABASE_URL and fix protocol if needed
   if (process.env.DATABASE_URL) {
     const dbUrl = process.env.DATABASE_URL;
@@ -35,6 +43,18 @@ function fixPrismaVercel() {
     } else {
       console.log(
         "[fix-prisma-vercel] DATABASE_URL already has correct postgresql:// protocol"
+      );
+    }
+
+    // Add pgBouncer configuration if not already present
+    if (!process.env.DATABASE_URL.includes("pgbouncer=true")) {
+      process.env.DATABASE_URL = `${process.env.DATABASE_URL}${
+        process.env.DATABASE_URL.includes("?") ? "&" : "?"
+      }pgbouncer=true&connection_limit=${
+        process.env.DATABASE_CONNECTION_LIMIT
+      }`;
+      console.log(
+        "[fix-prisma-vercel] Added pgBouncer configuration to DATABASE_URL"
       );
     }
   } else {
@@ -65,20 +85,48 @@ function fixPrismaVercel() {
         "[fix-prisma-vercel] DIRECT_URL already has correct postgresql:// protocol"
       );
     }
+
+    // Remove pgBouncer from DIRECT_URL if present (needed for schema migrations)
+    if (process.env.DIRECT_URL.includes("pgbouncer=true")) {
+      process.env.DIRECT_URL = process.env.DIRECT_URL.replace(
+        /[?&]pgbouncer=true(&|$)/,
+        "$1"
+      );
+      console.log(
+        "[fix-prisma-vercel] Removed pgBouncer configuration from DIRECT_URL for migrations"
+      );
+    }
   }
 
   // Log final configuration
   console.log("[fix-prisma-vercel] Prisma configuration summary:");
   console.log(`- Engine type: ${process.env.PRISMA_CLIENT_ENGINE_TYPE}`);
   console.log(
+    `- Connection pool limit: ${process.env.DATABASE_CONNECTION_LIMIT}`
+  );
+  console.log(
+    `- Connection pool timeout: ${process.env.DATABASE_POOL_TIMEOUT}`
+  );
+  console.log(
     `- DATABASE_URL protocol: ${
       process.env.DATABASE_URL?.split("://")[0] || "not set"
     }`
   );
+  console.log(
+    `- DATABASE_URL has pgBouncer: ${
+      process.env.DATABASE_URL?.includes("pgbouncer=true") ? "Yes" : "No"
+    }`
+  );
+
   if (process.env.DIRECT_URL) {
     console.log(
       `- DIRECT_URL protocol: ${
         process.env.DIRECT_URL?.split("://")[0] || "not set"
+      }`
+    );
+    console.log(
+      `- DIRECT_URL has pgBouncer: ${
+        process.env.DIRECT_URL?.includes("pgbouncer=true") ? "Yes" : "No"
       }`
     );
   }

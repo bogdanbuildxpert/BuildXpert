@@ -25,7 +25,8 @@
     "docker:verify": "node docker-env.js",
     "docker:start": "npm run docker:verify && docker-compose up -d",
     "check-db": "node scripts/check-database.js",
-    "fix-deploy": "node scripts/fix-deploy.js"
+    "fix-deploy": "node scripts/fix-deploy.js",
+    "verify-db-conn": "node scripts/verify-db-connection.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",

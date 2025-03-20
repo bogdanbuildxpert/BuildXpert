@@ -14,55 +14,25 @@ console.log(
   process.env.DIRECT_URL ? "SET (masked for security)" : "NOT SET"
 );
 console.log("VERCEL:", process.env.VERCEL);
-console.log(
-  "PRISMA_CLIENT_ENGINE_TYPE:",
-  process.env.PRISMA_CLIENT_ENGINE_TYPE
-);
 
-// Force environment variables if they're not set
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL =
-    "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
-  console.log("Force set DATABASE_URL");
-}
+// Define the connection URL
+const connectionUrl =
+  "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
 
-if (!process.env.DIRECT_URL) {
-  process.env.DIRECT_URL =
-    "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert";
-  console.log("Force set DIRECT_URL");
-}
+// Force environment variables
+process.env.DATABASE_URL = connectionUrl;
+process.env.DIRECT_URL = connectionUrl;
 
-// Explicitly set variables to disable data proxy
-process.env.PRISMA_CLIENT_ENGINE_TYPE = "binary";
-console.log("Force set PRISMA_CLIENT_ENGINE_TYPE=binary");
+// Create .env files with our variables
+const envContent = `DATABASE_URL=${connectionUrl}
+DIRECT_URL=${connectionUrl}`;
 
-// Explicitly prevent data proxy
-process.env.PRISMA_GENERATE_DATAPROXY = "false";
-console.log("Force set PRISMA_GENERATE_DATAPROXY=false");
-
-// Remove any leftover data proxy variables
-delete process.env.PRISMA_DATA_PROXY_URL;
-console.log("Deleted PRISMA_DATA_PROXY_URL if it existed");
-
-// Path to the .env file for Next.js
-const envPath = path.join(process.cwd(), ".env");
-
-// Create a .env file with our variables
 try {
-  const envContent = `
-DATABASE_URL=postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert
-DIRECT_URL=postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert
-PRISMA_CLIENT_ENGINE_TYPE=binary
-PRISMA_GENERATE_DATAPROXY=false
-`;
-  fs.writeFileSync(envPath, envContent, "utf8");
+  // Write to .env
+  fs.writeFileSync(path.join(process.cwd(), ".env"), envContent, "utf8");
   console.log("Created .env file with database connection variables");
-} catch (err) {
-  console.error("Error creating .env file:", err);
-}
 
-// Create a .env.production file as well
-try {
+  // Write to .env.production
   fs.writeFileSync(
     path.join(process.cwd(), ".env.production"),
     envContent,
@@ -70,25 +40,15 @@ try {
   );
   console.log("Created .env.production file with same variables");
 } catch (err) {
-  console.error("Error creating .env.production file:", err);
+  console.error("Error creating env files:", err);
 }
 
-// Run native npm commands instead of relying on package.json scripts
-try {
-  console.log(
-    "Attempting to direct generate Prisma client with --no-engine flag"
-  );
-  execSync("npx prisma generate --no-engine", { stdio: "inherit" });
-} catch (err) {
-  console.error("Error manually generating Prisma client:", err);
-}
-
-// Load and write to prisma file if needed
+// Update schema.prisma if needed
 try {
   const schemaPath = path.join(process.cwd(), "prisma", "schema.prisma");
   let schema = fs.readFileSync(schemaPath, "utf8");
 
-  // Make sure direct URL is configured
+  // Ensure schema has correct datasource configuration
   if (!schema.includes("directUrl")) {
     schema = schema.replace(
       "datasource db {",
@@ -109,6 +69,15 @@ try {
   }
 } catch (err) {
   console.error("Error updating schema.prisma:", err);
+}
+
+// Generate Prisma Client
+try {
+  console.log("Generating Prisma Client...");
+  execSync("npx prisma generate", { stdio: "inherit" });
+  console.log("Successfully generated Prisma Client");
+} catch (err) {
+  console.error("Failed to generate Prisma Client:", err);
 }
 
 console.log("===============================================");

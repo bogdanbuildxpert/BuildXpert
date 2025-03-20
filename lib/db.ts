@@ -26,14 +26,11 @@ export const prisma =
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
         : ["error"],
-    // PostgreSQL-specific connection settings
     datasources: {
       db: {
         url: databaseUrl,
       },
     },
-    // Connection pool settings are configured in the DATABASE_URL
-    // or in the Prisma schema, not here
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

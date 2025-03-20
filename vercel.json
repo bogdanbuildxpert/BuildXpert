@@ -4,7 +4,12 @@
   "installCommand": "npm install",
   "build": {
     "env": {
-      "PRISMA_GENERATE_DATAPROXY": "false"
+      "PRISMA_GENERATE_DATAPROXY": "false",
+      "PRISMA_CLIENT_ENGINE_TYPE": "binary"
     }
+  },
+  "env": {
+    "PRISMA_CLIENT_ENGINE_TYPE": "binary",
+    "PRISMA_GENERATE_DATAPROXY": "false"
   }
 }

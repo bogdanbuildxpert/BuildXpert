@@ -1,58 +1,77 @@
 // Configure Prisma environment variables before they're used
 // This ensures that URLs are correctly formatted
 
-// Check if we're in a Vercel preview deployment
+// Check if we're in a Vercel environment
 const isVercelPreview = process.env.VERCEL_ENV === "preview";
+const isVercelProduction =
+  process.env.VERCEL === "1" && process.env.NODE_ENV === "production";
+const isDataProxyEnabled =
+  process.env.PRISMA_CLIENT_ENGINE_TYPE === "dataproxy" || isVercelProduction;
+
 if (isVercelPreview) {
   console.log("[prisma-config] Running in Vercel preview environment");
+} else if (isVercelProduction) {
+  console.log("[prisma-config] Running in Vercel production environment");
+  // Force Data Proxy mode for Vercel production
+  process.env.PRISMA_CLIENT_ENGINE_TYPE = "dataproxy";
 }
 
 // Check if the DATABASE_URL is using the correct protocol
 const fixDatabaseUrl = (url: string | undefined): string | undefined => {
   if (!url) return url;
 
-  // If URL starts with prisma://, leave it as is
-  if (url.startsWith("prisma://")) {
+  // Get the protocol from the URL
+  const protocol = url.split("://")[0] || "";
+  const rest = url.split("://")[1] || url;
+
+  // Determine the correct protocol based on engine type
+  if (isDataProxyEnabled) {
+    // Data Proxy requires prisma:// protocol
+    if (protocol !== "prisma") {
+      console.log(
+        `[prisma-config] Converting ${protocol}:// to prisma:// for Data Proxy`
+      );
+      return `prisma://${rest}`;
+    }
     return url;
-  }
-
-  // If URL starts with postgresql://, it should be fine for Prisma
-  if (url.startsWith("postgresql://")) {
-    return url;
-  }
-
-  // If URL doesn't have a proper protocol, log an error
-  console.error(
-    `[prisma-config] Invalid DATABASE_URL protocol: ${
-      url.split("://")[0] || "missing"
-    }`
-  );
-
-  // Try to fix the URL by replacing or adding postgresql:// prefix
-  if (url.includes("://")) {
-    // Replace the existing protocol with postgresql://
-    return url.replace(/^.*?:\/\//, "postgresql://");
   } else {
-    // Add the postgresql:// prefix if no protocol exists
-    return `postgresql://${url}`;
+    // Library engine requires postgresql:// protocol
+    if (protocol !== "postgresql" && protocol !== "postgres") {
+      console.log(
+        `[prisma-config] Converting ${protocol}:// to postgresql:// for library engine`
+      );
+      return `postgresql://${rest}`;
+    }
+    return url;
   }
 };
 
 // Set environment variables before Prisma tries to use them
 if (process.env.DATABASE_URL) {
   process.env.DATABASE_URL = fixDatabaseUrl(process.env.DATABASE_URL);
-  console.log("[prisma-config] Setting DATABASE_URL protocol to postgresql://");
+  console.log(
+    `[prisma-config] DATABASE_URL protocol: ${
+      process.env.DATABASE_URL?.split("://")[0] || "unknown"
+    }`
+  );
 }
 
+// Direct URL should always use postgresql:// regardless of engine type
 if (process.env.DIRECT_URL) {
-  process.env.DIRECT_URL = fixDatabaseUrl(process.env.DIRECT_URL);
-  console.log("[prisma-config] Setting DIRECT_URL protocol to postgresql://");
+  const directUrl = process.env.DIRECT_URL;
+  const protocol = directUrl.split("://")[0] || "";
+  const rest = directUrl.split("://")[1] || directUrl;
+
+  if (protocol !== "postgresql" && protocol !== "postgres") {
+    process.env.DIRECT_URL = `postgresql://${rest}`;
+    console.log("[prisma-config] Setting DIRECT_URL protocol to postgresql://");
+  }
 }
 
-// Set engine type for Prisma (important for serverless environments)
-if (!process.env.PRISMA_CLIENT_ENGINE_TYPE) {
-  process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
-  console.log("[prisma-config] Setting PRISMA_CLIENT_ENGINE_TYPE=library");
-}
+// Log engine type
+console.log(
+  "[prisma-config] Engine type:",
+  process.env.PRISMA_CLIENT_ENGINE_TYPE || "not set"
+);
 
 export default {};

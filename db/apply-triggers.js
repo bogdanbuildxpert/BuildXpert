@@ -5,6 +5,15 @@ const path = require("path");
 const { Client } = require("pg");
 
 async function applyTriggers() {
+  console.log(
+    "Messaging system has been removed - skipping trigger application"
+  );
+
+  // No triggers to apply
+  console.log("Trigger application process completed");
+  return;
+
+  // The code below is no longer executed
   console.log("Applying PostgreSQL triggers for notifications...");
 
   const client = new Client({
@@ -19,13 +28,30 @@ async function applyTriggers() {
     await client.connect();
     console.log("Connected to database");
 
+    // Check if Message table exists
+    const tableCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'Message'
+      );
+    `);
+
+    const messageTableExists = tableCheck.rows[0].exists;
+    console.log(`Message table exists: ${messageTableExists}`);
+
     // Read the SQL file
     const sqlPath = path.join(__dirname, "notifications-triggers.sql");
-    const sql = fs.readFileSync(sqlPath, "utf8");
+    let sql = fs.readFileSync(sqlPath, "utf8");
 
     // Execute the SQL
-    await client.query(sql);
-    console.log("Successfully applied notification triggers");
+    try {
+      await client.query(sql);
+      console.log("Successfully applied notification triggers");
+    } catch (error) {
+      console.error("Error in SQL execution:", error.message);
+      console.log("Continuing with the rest of the process...");
+    }
 
     // Test the LISTEN/NOTIFY system
     await client.query("LISTEN test_channel");
@@ -53,5 +79,5 @@ async function applyTriggers() {
 
 // Run the function
 applyTriggers().then(() => {
-  console.log("Trigger application process completed");
+  console.log("Process completed");
 });

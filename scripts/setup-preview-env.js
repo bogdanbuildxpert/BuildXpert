@@ -9,49 +9,18 @@
 function setupPreviewEnvironment() {
   // Check if we're in a Vercel preview deployment
   const isVercelPreview = process.env.VERCEL_ENV === "preview";
-  const isVercelProduction =
-    process.env.VERCEL === "1" && process.env.NODE_ENV === "production";
 
   console.log(
     `[setup-preview] Environment: ${
-      isVercelProduction
-        ? "Vercel Production"
-        : isVercelPreview
-        ? "Vercel Preview"
-        : "Development/Other"
+      isVercelPreview ? "Vercel Preview" : "Production or Development"
     }`
   );
 
-  // Determine if we need to use Data Proxy
-  if (isVercelProduction) {
-    console.log(
-      "[setup-preview] Production environment detected - using Data Proxy"
-    );
-    process.env.PRISMA_CLIENT_ENGINE_TYPE = "dataproxy";
+  // Always use library engine
+  process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+  console.log("[setup-preview] Using library engine type");
 
-    // Ensure URL has prisma:// protocol for Data Proxy
-    if (
-      process.env.DATABASE_URL &&
-      !process.env.DATABASE_URL.startsWith("prisma://")
-    ) {
-      // Save the original URL in case we need it
-      process.env.ORIGINAL_DATABASE_URL = process.env.DATABASE_URL;
-
-      // Add prisma:// protocol if DATABASE_URL doesn't already have it
-      if (process.env.DATABASE_URL.includes("://")) {
-        // Replace existing protocol with prisma://
-        process.env.DATABASE_URL = process.env.DATABASE_URL.replace(
-          /^.*?:\/\//,
-          "prisma://"
-        );
-      } else {
-        // Add prisma:// prefix if no protocol exists
-        process.env.DATABASE_URL = `prisma://${process.env.DATABASE_URL}`;
-      }
-
-      console.log("[setup-preview] Set DATABASE_URL protocol to prisma://");
-    }
-  } else if (isVercelPreview) {
+  if (isVercelPreview) {
     // For preview environments, we use a mock database
     console.log(
       "[setup-preview] Preview environment detected - using mock database"
@@ -79,11 +48,22 @@ function setupPreviewEnvironment() {
       );
     }
   } else {
-    // For development, we use the standard library client
-    console.log(
-      "[setup-preview] Development/Other environment - using library engine"
-    );
-    process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";
+    // For production and development, use the standard library client
+    console.log("[setup-preview] Using standard database configuration");
+
+    // Ensure DATABASE_URL has postgresql:// protocol
+    if (
+      process.env.DATABASE_URL &&
+      !process.env.DATABASE_URL.startsWith("postgresql://")
+    ) {
+      const dbUrlParts = process.env.DATABASE_URL.split("://");
+      console.log(
+        `[setup-preview] Converting DATABASE_URL from ${dbUrlParts[0]}:// to postgresql://`
+      );
+      process.env.DATABASE_URL = `postgresql://${
+        dbUrlParts[1] || process.env.DATABASE_URL
+      }`;
+    }
   }
 }
 

@@ -7,6 +7,9 @@ function fixPrismaVercel() {
   console.log(
     "[fix-prisma-vercel] Configuring Prisma for Vercel deployment..."
   );
+  console.log(
+    "[fix-prisma-vercel] Build triggered at: " + new Date().toISOString()
+  );
 
   // Always use library engine type
   process.env.PRISMA_CLIENT_ENGINE_TYPE = "library";

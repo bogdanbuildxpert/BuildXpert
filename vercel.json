@@ -4,14 +4,11 @@
   "installCommand": "npm install",
   "build": {
     "env": {
-      "PRISMA_GENERATE_DATAPROXY": "false",
-      "PRISMA_CLIENT_ENGINE_TYPE": "binary"
+      "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
     }
   },
   "env": {
-    "PRISMA_CLIENT_ENGINE_TYPE": "binary",
-    "PRISMA_GENERATE_DATAPROXY": "false",
-    "DATABASE_POSTGRES_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
-    "NODE_ENV": "production"
+    "DATABASE_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert",
+    "DIRECT_URL": "postgresql://buildxpertuser:Madalina123@178.62.45.226:5432/buildxpert"
   }
 }

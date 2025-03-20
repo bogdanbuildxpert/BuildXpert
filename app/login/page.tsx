@@ -65,62 +65,24 @@ function LoginPageContent() {
     setIsLoading(true);
 
     try {
-      let response;
-      try {
-        response = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: loginData.email,
-            password: loginData.password,
-          }),
-        });
-      } catch (fetchError) {
-        console.error("Network error during login fetch:", fetchError);
-        throw new Error(
-          "Network error. Please check your connection and try again."
-        );
+      // Use NextAuth's signIn function instead of direct API call
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: loginData.email,
+        password: loginData.password,
+      });
+
+      if (result?.error) {
+        throw new Error(result.error || "Failed to login");
       }
-
-      // Check if the response is JSON before trying to parse it
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        // Handle non-JSON response
-        const text = await response.text();
-        console.error("Received non-JSON response:", text);
-        throw new Error(
-          "Server returned an invalid response. Please try again later."
-        );
-      }
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error("Error parsing JSON response:", jsonError);
-        throw new Error(
-          "Failed to process server response. Please try again later."
-        );
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to login");
-      }
-
-      // Use the login function from auth context
-      login(data.user);
-
-      // Set the user in a cookie for server-side access
-      document.cookie = `user=${JSON.stringify(data.user)}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }`; // 7 days
 
       toast.success("Login successful!");
 
-      // Redirect to the original URL or home page
-      router.push(redirectUrl);
+      // Redirect to the original URL or home page after a short delay to allow state updates
+      setTimeout(() => {
+        router.push(redirectUrl);
+        router.refresh();
+      }, 500);
     } catch (error) {
       console.error("Login error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to login");

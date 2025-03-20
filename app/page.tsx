@@ -188,8 +188,8 @@ export default function Home() {
                   Direct Communication
                 </h3>
                 <p className="text-muted-foreground">
-                  Stay connected with our team through integrated chat
-                  functionality for seamless project coordination.
+                  Stay connected with our team through email updates and phone
+                  support for seamless project coordination.
                 </p>
               </div>
             </div>

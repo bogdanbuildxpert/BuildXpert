@@ -79,8 +79,8 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/images/AppImages/TabLogo.webp",
-        type: "image/webp",
+        url: "/favicon.png",
+        type: "image/png",
       },
       {
         url: "/favicon.svg",
@@ -88,12 +88,13 @@ export const metadata: Metadata = {
       },
     ],
     apple: {
-      url: "/images/AppImages/TabLogo.webp",
-      type: "image/webp",
+      url: "/favicon.png",
+      type: "image/png",
+      sizes: "180x180",
     },
     shortcut: {
-      url: "/images/AppImages/TabLogo.webp",
-      type: "image/webp",
+      url: "/favicon.png",
+      type: "image/png",
     },
   },
 };
@@ -106,11 +107,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link
-          rel="icon"
-          href="/images/AppImages/TabLogo.webp"
-          type="image/webp"
-        />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.png" type="image/png" />
+        <link rel="shortcut icon" href="/favicon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

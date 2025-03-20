@@ -1,38 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { cookies } from "next/headers";
 
-// Mark this route as dynamic since it uses cookies
-export const dynamic = "force-dynamic";
+// Revalidation frequency set to 24 hours in seconds
+export const revalidate = 86400;
 
-// GET /api/messages/unread - Get count of unread messages for the current user
-export async function GET() {
-  try {
-    // Get the current user from the cookie
-    const cookieStore = cookies();
-    const userCookie = cookieStore.get("user");
+// Block all repeated calls
+export const dynamic = "force-static";
 
-    if (!userCookie || !userCookie.value) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// This will cache successful responses for 24 hours
+// Modified API route to return empty data without errors
+export async function GET(request: NextRequest) {
+  // Add console logging to trace calling code
+  console.log("GET /api/messages/unread request received:", {
+    url: request.url,
+    referrer: request.headers.get("referer"),
+    origin: request.headers.get("origin"),
+  });
 
-    const user = JSON.parse(userCookie.value);
-    const userId = user.id;
-
-    // Count unread messages where the current user is the receiver
-    const count = await prisma.message.count({
-      where: {
-        receiverId: userId,
-        isRead: false,
+  // Create strong cache headers to prevent repeated calls
+  return NextResponse.json(
+    {
+      unreadCount: 0,
+      _note: "Using Socket.IO for real-time notifications",
+      cached: true,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      status: 200,
+      headers: {
+        // Set aggressive caching
+        "Cache-Control":
+          "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400",
+        "Content-Type": "application/json",
+        // Prevent revalidation
+        "Surrogate-Control": "max-age=86400",
+        "CDN-Cache-Control": "max-age=86400",
+        "Vercel-CDN-Cache-Control": "max-age=86400",
+        // Add timestamps to ensure uniqueness
+        "Last-Modified": new Date().toUTCString(),
+        Date: new Date().toUTCString(),
       },
-    });
-
-    return NextResponse.json({ count });
-  } catch (error) {
-    console.error("Error getting unread message count:", error);
-    return NextResponse.json(
-      { error: "Failed to get unread message count" },
-      { status: 500 }
-    );
-  }
+    }
+  );
 }

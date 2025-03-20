@@ -470,38 +470,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            {/* Chat Component */}
-            {user &&
-              job.status === "PLANNING" &&
-              // Don't show chat if job is posted by an admin
-              (!job.poster.role ||
-                (job.poster.role !== "ADMIN" &&
-                  job.poster.role !== "admin")) && (
-                <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
-                  <div className="border-b px-6 py-4">
-                    <h2 className="text-xl font-semibold">Chat with us</h2>
-                  </div>
-                  <div className="p-6">
-                    {isJobPoster || isAdmin ? (
-                      <SimpleJobChat
-                        jobId={job.id}
-                        jobPosterId={job.poster.id}
-                      />
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Interested in this job? Contact the client directly.
-                        </p>
-                        <Button className="w-full" asChild>
-                          <Link href={`/messages?jobId=${job.id}`}>
-                            Send Message
-                          </Link>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+            {/* Chat Component removed - feature temporarily disabled */}
           </div>
         </div>
       </div>

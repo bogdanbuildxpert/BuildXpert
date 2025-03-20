@@ -8,6 +8,12 @@ import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import io from "socket.io-client";
 
+// These variables help throttle API calls across all instances of JobChat
+const THROTTLE_DELAY = 5000; // 5 seconds
+let lastFetchTime = 0;
+let isFetchingGlobally = false;
+let pendingFetchRequest = false;
+
 interface Message {
   id: string;
   content: string;
@@ -37,6 +43,12 @@ interface JobChatProps {
   adminId?: string; // Optional admin ID for direct messaging
 }
 
+// Helper function to check if we should throttle
+function shouldThrottle(): boolean {
+  const now = Date.now();
+  return now - lastFetchTime < THROTTLE_DELAY || isFetchingGlobally;
+}
+
 export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,6 +60,7 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMountedRef = useRef(true);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const hasLoadedMessagesRef = useRef(false);
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "admin";
   const isJobPoster = user?.id === jobPosterId;
@@ -78,7 +91,19 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
 
   // Fetch messages (initial load and manual refresh)
   const fetchMessages = useCallback(async () => {
-    if (!user || !isMountedRef.current) return;
+    if (!user || !isMountedRef.current || !jobId) return;
+
+    // Skip if already fetching or throttled
+    if (shouldThrottle()) {
+      console.log(`Throttling messages fetch for job ${jobId}`);
+      pendingFetchRequest = true;
+      return;
+    }
+
+    // Set global fetch state
+    isFetchingGlobally = true;
+    lastFetchTime = Date.now();
+    pendingFetchRequest = false;
 
     try {
       setIsLoading(true);
@@ -86,7 +111,11 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       // For both admin and job poster, we want to see the conversation between them
       const url = `/api/messages?jobId=${jobId}&userId=${user.id}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch messages");
@@ -97,6 +126,7 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       // Only update state if component is still mounted
       if (isMountedRef.current) {
         setMessages(data);
+        hasLoadedMessagesRef.current = true;
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -104,8 +134,18 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
         toast.error("Failed to load messages");
       }
     } finally {
+      isFetchingGlobally = false;
       if (isMountedRef.current) {
         setIsLoading(false);
+      }
+
+      // Check if another fetch was requested while we were fetching
+      if (pendingFetchRequest && isMountedRef.current) {
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            fetchMessages();
+          }
+        }, 1000); // Small delay to prevent immediate refetching
       }
     }
   }, [user, jobId]);
@@ -115,91 +155,80 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Only scroll to bottom on initial load, not when messages change
-  useEffect(() => {
-    // Only scroll on initial load
-    if (isLoading) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-    }
-  }, [isLoading]);
-
   // Set up Socket.IO connection for real-time messages
   useEffect(() => {
     if (!user || !jobId) return;
 
-    let refreshInterval: NodeJS.Timeout | null = null;
+    // First fetch existing messages once when the component mounts
+    fetchMessages();
+
     let socket: any = null;
 
     try {
-      // First fetch existing messages
-      fetchMessages();
-
       // Set up socket connection
       socket = io(window.location.origin, {
-        path: "/socket.io",
+        path: "/socket.io/",
         transports: ["polling", "websocket"],
         forceNew: true,
         reconnectionAttempts: 3,
         timeout: 20000,
       });
 
+      // Store socket in ref for later use
+      socketRef.current = socket;
+
       socket.on("connect", () => {
-        console.log("Socket.IO connected");
+        console.log(
+          `[JobChat] Socket connected with ID: ${socket.id} for job ${jobId}`
+        );
         setSocketConnected(true);
 
         // Join user-specific room
-        socket.emit("join", user.id);
-
-        // Clear any polling interval if it exists
-        if (refreshInterval) {
-          clearInterval(refreshInterval);
-          refreshInterval = null;
+        if (user.id) {
+          socket.emit("join", user.id);
+          console.log(`[JobChat] Joined room for user: ${user.id}`);
         }
       });
 
       socket.on("disconnect", () => {
-        console.log("Socket.IO disconnected");
+        console.log(`[JobChat] Socket disconnected for job ${jobId}`);
         setSocketConnected(false);
       });
 
       socket.on("connect_error", (error: Error) => {
-        console.error("Socket.IO connection error:", error);
+        console.error(
+          `[JobChat] Socket connection error for job ${jobId}:`,
+          error
+        );
         setSocketConnected(false);
-
-        // Set up polling as fallback
-        if (!refreshInterval) {
-          console.log("Setting up polling fallback for messages");
-          refreshInterval = setInterval(() => {
-            fetchMessages();
-          }, 10000); // Poll every 10 seconds
-        }
       });
 
       socket.on("reconnect", (attemptNumber: number) => {
-        console.log(`Socket reconnected after ${attemptNumber} attempts`);
-        setSocketConnected(true);
-        // Re-join the room after reconnection
-        socket.emit("join", user.id);
-      });
-
-      socket.on("reconnect_attempt", (attemptNumber: number) => {
-        console.log(`Socket reconnection attempt #${attemptNumber}`);
-      });
-
-      socket.on("reconnect_error", (error: Error) => {
-        console.error("Socket reconnection error:", error);
-      });
-
-      socket.on("reconnect_failed", () => {
-        console.error("Socket failed to reconnect after all attempts");
-        toast.error(
-          "Failed to connect to chat server. Please refresh the page."
+        console.log(
+          `[JobChat] Socket reconnected after ${attemptNumber} attempts for job ${jobId}`
         );
+        setSocketConnected(true);
+
+        // Re-join the room after reconnection
+        if (user.id) {
+          socket.emit("join", user.id);
+          console.log(`[JobChat] Rejoined room for user: ${user.id}`);
+        }
+
+        // Only fetch messages if we haven't loaded them recently
+        if (!shouldThrottle() && hasLoadedMessagesRef.current) {
+          fetchMessages();
+        }
       });
 
       // Listen for new messages
       socket.on("new_message", (message: Message) => {
-        console.log("Received new message via socket:", message);
+        console.log(
+          `[JobChat] Received new message via socket for job ${jobId}:`,
+          message
+        );
+
+        // Only handle messages for this specific job
         if (message.jobId === jobId) {
           // Add message if it's not already in the list
           setMessages((prev) => {
@@ -210,10 +239,15 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
           });
 
           // Mark message as read if user is the receiver
-          if (message.receiverId === user.id) {
+          if (message.receiverId === user.id && socket.connected) {
+            console.log(`[JobChat] Marking message ${message.id} as read`);
+
             // First update the API
             fetch(`/api/messages/read?jobId=${jobId}&userId=${user.id}`, {
               method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
             })
               .then(() => {
                 // Then emit the socket event to notify the sender
@@ -222,9 +256,15 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
                   readBy: user.id,
                   senderId: message.senderId,
                 });
+                console.log(
+                  `[JobChat] Emitted mark_read event for job ${jobId}`
+                );
               })
               .catch((err) =>
-                console.error("Error marking messages as read:", err)
+                console.error(
+                  `[JobChat] Error marking messages as read for job ${jobId}:`,
+                  err
+                )
               );
           }
         }
@@ -232,6 +272,11 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
 
       // Listen for messages being marked as read
       socket.on("messages_read", (data: { jobId: string; readBy: string }) => {
+        console.log(
+          `[JobChat] Received messages_read event for job ${jobId}:`,
+          data
+        );
+
         if (data.jobId === jobId) {
           // Update read status for messages sent by current user
           setMessages((prev) =>
@@ -245,21 +290,19 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       });
     } catch (error) {
       console.warn(
-        "Failed to initialize Socket.IO, falling back to polling",
+        `[JobChat] Failed to initialize Socket.IO for job ${jobId}, falling back to one-time fetch`,
         error
       );
-      // Set up polling as fallback
-      refreshInterval = setInterval(() => {
-        fetchMessages();
-      }, 10000); // Poll every 10 seconds
+
+      // Just fetch once on error, no continuous polling
+      fetchMessages();
     }
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
+      if (socketRef.current) {
+        console.log(`[JobChat] Cleaning up socket connection for job ${jobId}`);
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
   }, [user, jobId, fetchMessages]);
@@ -303,7 +346,10 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       }
 
       const newMessageData = await response.json();
-      console.log("Message created successfully:", newMessageData);
+      console.log(
+        `[JobChat] Message created successfully for job ${jobId}:`,
+        newMessageData
+      );
 
       // Clear the input field after sending
       setNewMessage("");
@@ -316,17 +362,9 @@ export function JobChat({ jobId, jobPosterId, adminId }: JobChatProps) {
       // Add the message to the local state immediately for better UX
       setMessages((prev) => [...prev, newMessageData]);
 
-      // Emit the new message to Socket.IO
-      if (socketRef.current && socketRef.current.connected) {
-        console.log("Emitting send_message event:", newMessageData);
-        socketRef.current.emit("send_message", newMessageData);
-      } else {
-        console.warn(
-          "Socket not connected, message will not be sent in real-time"
-        );
-      }
+      // The PostgreSQL trigger will handle the notification, no need to emit here
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error(`[JobChat] Error sending message for job ${jobId}:`, error);
       if (isMountedRef.current) {
         toast.error("Failed to send message");
       }

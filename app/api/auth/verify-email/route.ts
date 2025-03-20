@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/token";
 
+// Add this export to make the route dynamically rendered
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     console.log("[verify-email] Processing email verification request");

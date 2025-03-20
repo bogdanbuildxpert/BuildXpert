@@ -9,7 +9,7 @@
     "dev": "node simple-server.js",
     "dev:next": "next dev",
     "build": "node scripts/debug-prisma-env.js && cross-env PRISMA_CLIENT_ENGINE_TYPE=library PRISMA_GENERATE_DATAPROXY=false prisma generate && next build",
-    "vercel-build": "node scripts/debug-prisma-env.js && node scripts/fix-prisma-protocol.js && cross-env PRISMA_CLIENT_ENGINE_TYPE=library PRISMA_GENERATE_DATAPROXY=false prisma generate && next build",
+    "vercel-build": "node scripts/setup-preview-env.js && node scripts/debug-prisma-env.js && node scripts/fix-prisma-protocol.js && cross-env PRISMA_CLIENT_ENGINE_TYPE=library PRISMA_GENERATE_DATAPROXY=false prisma generate && next build",
     "postinstall": "cross-env PRISMA_CLIENT_ENGINE_TYPE=library PRISMA_GENERATE_DATAPROXY=false prisma generate && node db/apply-triggers.js",
     "start": "cross-env NODE_ENV=production node simple-server.js",
     "start:next": "next start",

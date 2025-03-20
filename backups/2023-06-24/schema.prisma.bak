@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
+  relationMode = "foreignKeys"
+}
+
+model User {
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  password         String
+  role             UserRole  @default(CLIENT)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  emailVerified    DateTime?
+  postedJobs       Job[]     @relation("JobPoster")
+  projects         Project[]
+  reviews          Review[]  @relation("ReviewAuthor")
+  receivedReviews  Review[]  @relation("ReviewReceiver")
+  services         Service[] @relation("ServiceProvider")
+  jobs             Job[]     @relation("AppliedJobs")
+
+  @@index([role])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  budget      Float?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      ProjectStatus @default(PLANNING)
+  location    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  clientId    String
+  materials   Material[]
+  client      User          @relation(fields: [clientId], references: [id])
+  tasks       Task[]
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  projectId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation(fields: [projectId], references: [id])
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  name      String
+  quantity  Float
+  unit      String
+  price     Float?
+  supplier  String?
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id])
+}
+
+model Job {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  location    String?
+  posterId    String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  metadata    Json?
+  status      ProjectStatus @default(PLANNING)
+  poster      User          @relation("JobPoster", fields: [posterId], references: [id])
+  applicants  User[]        @relation("AppliedJobs")
+
+  @@index([posterId])
+  @@index([status])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float?
+  duration    String?
+  providerId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviews     Review[]
+  provider    User     @relation("ServiceProvider", fields: [providerId], references: [id])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  rating     Int      @default(0)
+  comment    String?
+  authorId   String
+  receiverId String
+  serviceId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  receiver   User     @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  service    Service? @relation(fields: [serviceId], references: [id])
+}
+
+model Contact {
+  id               String        @id @default(cuid())
+  name             String
+  email            String
+  phone            String?
+  message          String
+  status           ContactStatus @default(NEW)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  preferredContact ContactMethod @default(EMAIL)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  subject     String
+  content     String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+  FILLED
+}
+
+enum ContactMethod {
+  EMAIL
+  PHONE
+}
+
+enum ContactStatus {
+  NEW
+  REVIEWED
+  RESPONDED
+  ARCHIVED
+}

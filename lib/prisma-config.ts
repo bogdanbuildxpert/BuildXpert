@@ -1,6 +1,12 @@
 // Configure Prisma environment variables before they're used
 // This ensures that URLs are correctly formatted
 
+// Check if we're in a Vercel preview deployment
+const isVercelPreview = process.env.VERCEL_ENV === "preview";
+if (isVercelPreview) {
+  console.log("[prisma-config] Running in Vercel preview environment");
+}
+
 // Check if the DATABASE_URL is using the correct protocol
 const fixDatabaseUrl = (url: string | undefined): string | undefined => {
   if (!url) return url;

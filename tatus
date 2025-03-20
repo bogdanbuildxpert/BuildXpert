@@ -1,0 +1,7 @@
+[33mcommit 97aa8f1c582a5227ec027c2865193ae36c93fc3b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: bogdanhutuleac <bogdanhutuleac@outlook.com>
+Date:   Thu Mar 20 13:29:52 2025 +0000
+
+    Fix Supabase integration in Vercel build
+
+scripts/debug-prisma-env.js

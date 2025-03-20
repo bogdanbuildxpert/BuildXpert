@@ -52,6 +52,7 @@ function createMockPrismaClient() {
   const mockClient = {
     user: {
       findUnique: async () => null,
+      findFirst: async () => null,
       findMany: async () => [],
       create: async () => ({}),
       update: async () => ({}),
@@ -60,6 +61,7 @@ function createMockPrismaClient() {
     },
     message: {
       findUnique: async () => null,
+      findFirst: async () => null,
       findMany: async () => [],
       create: async () => ({}),
       update: async () => ({}),
@@ -68,6 +70,7 @@ function createMockPrismaClient() {
     },
     job: {
       findUnique: async () => null,
+      findFirst: async () => null,
       findMany: async () => [],
       create: async () => ({}),
       update: async () => ({}),

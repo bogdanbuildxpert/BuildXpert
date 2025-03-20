@@ -1,6 +1,6 @@
 generator client {
   provider   = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  previewFeatures = ["driverAdapters", "postgresqlExtensions"]
   binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
   // This ensures the hook runs on all environments including Vercel
   pregenerate = "node ./pregenerate.js"

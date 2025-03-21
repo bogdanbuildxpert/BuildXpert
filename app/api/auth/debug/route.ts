@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getJwtStatus } from "@/lib/token";
 import { transporter } from "@/lib/email";
 
+// Prevent static generation for this API route to avoid build timeouts
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // Check JWT configuration

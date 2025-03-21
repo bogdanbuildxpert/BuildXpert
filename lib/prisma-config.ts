@@ -25,11 +25,16 @@ if (!process.env.PRISMA_CLIENT_ENGINE_TYPE) {
 
 // Set connection pool configuration for pgBouncer
 if (process.env.PRISMA_CLIENT_ENGINE_TYPE === "library") {
-  // Configure connection limits for pgBouncer compatibility
-  process.env.DATABASE_CONNECTION_LIMIT = "5";
-  process.env.DATABASE_POOL_TIMEOUT = "15";
+  // Use the values from environment variables if they exist, otherwise set defaults
+  const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT || "5";
+  const poolTimeout = process.env.DATABASE_POOL_TIMEOUT || "30";
+
+  // Set or update the environment variables
+  process.env.DATABASE_CONNECTION_LIMIT = connectionLimit;
+  process.env.DATABASE_POOL_TIMEOUT = poolTimeout;
+
   console.log(
-    `[prisma-config] Set connection pool limits for pgBouncer compatibility`
+    `[prisma-config] Using connection pool settings: limit=${connectionLimit}, timeout=${poolTimeout}s`
   );
 }
 
@@ -53,13 +58,25 @@ if (
       );
     }
 
-    // Add pgBouncer configuration to URLs
+    // Add pgBouncer configuration to URLs if not already present
     if (!process.env.DATABASE_URL.includes("pgbouncer=true")) {
+      // Get connection parameters from environment
+      const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT || "5";
+      const poolTimeout = process.env.DATABASE_POOL_TIMEOUT || "30";
+
+      // Add pgBouncer configuration with connection settings
       process.env.DATABASE_URL = `${process.env.DATABASE_URL}${
         process.env.DATABASE_URL.includes("?") ? "&" : "?"
-      }pgbouncer=true&connection_limit=5`;
+      }pgbouncer=true&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}&statement_cache_size=0&application_name=buildxpert`;
+
       console.log(
-        `[prisma-config] Added pgBouncer configuration to DATABASE_URL`
+        `[prisma-config] Added pgBouncer configuration to DATABASE_URL with pinning settings`
+      );
+    } else if (!process.env.DATABASE_URL.includes("statement_cache_size=0")) {
+      // If pgBouncer is configured but missing statement_cache_size=0 (required for proper pinning)
+      process.env.DATABASE_URL = `${process.env.DATABASE_URL}&statement_cache_size=0&application_name=buildxpert`;
+      console.log(
+        `[prisma-config] Added statement cache settings to DATABASE_URL for proper connection pinning`
       );
     }
   }

@@ -13,6 +13,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Increase the static generation timeout to fix build issues
+  staticPageGenerationTimeout: 180, // Increase timeout from default 60 seconds to 180 seconds
   images: {
     unoptimized: true,
     domains: [],

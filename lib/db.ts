@@ -43,11 +43,18 @@ if (process.env.DIRECT_URL && isStaticBuild) {
   databaseUrl = process.env.DIRECT_URL;
 }
 
+// Get connection pool settings from environment variables
+const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT || "5";
+const poolTimeout = process.env.DATABASE_POOL_TIMEOUT || "30";
+
+// Log the database connection details (masking sensitive info)
+const maskedUrl = databaseUrl.includes("@")
+  ? databaseUrl.split("@")[1]
+  : databaseUrl.split("://")[0];
+
+console.log(`[db.ts] Database connection using URL: ${maskedUrl}`);
 console.log(
-  "[db.ts] Database connection using URL:",
-  databaseUrl.includes("@")
-    ? databaseUrl.split("@")[1]
-    : databaseUrl.split("://")[0]
+  `[db.ts] Connection pool settings: limit=${connectionLimit}, timeout=${poolTimeout}s`
 );
 
 // Create a real PrismaClient - no more mock client for static builds

@@ -44,13 +44,25 @@ export async function POST(request: NextRequest) {
     // Generate password reset token
     const resetToken = generatePasswordResetToken(email);
 
-    // Send password reset email
-    await sendPasswordResetEmail(email, resetToken);
+    // Send password reset email with better error handling
+    try {
+      await sendPasswordResetEmail(email, resetToken);
 
-    return NextResponse.json(
-      { message: "Password reset instructions sent to your email" },
-      { status: 200 }
-    );
+      return NextResponse.json(
+        { message: "Password reset instructions sent to your email" },
+        { status: 200 }
+      );
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError);
+
+      return NextResponse.json(
+        {
+          error:
+            "We're experiencing issues with our email service. Please try again later or contact support if the problem persists.",
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error in forgot password:", error);
     return NextResponse.json(

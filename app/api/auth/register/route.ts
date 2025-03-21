@@ -76,11 +76,13 @@ export async function POST(request: NextRequest) {
     console.log("[api/auth/register] Generating verification token");
     const verificationToken = generateVerificationToken(email);
 
-    // Send verification email
+    // Send verification email with better error handling
+    let emailSent = false;
     try {
       console.log("[api/auth/register] Sending verification email");
       await sendVerificationEmail(email, verificationToken);
       console.log("[api/auth/register] Verification email sent successfully");
+      emailSent = true;
     } catch (emailError) {
       console.error(
         "[api/auth/register] Failed to send verification email:",
@@ -96,8 +98,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...userWithoutPassword,
-        message:
-          "Registration successful. Please check your email to verify your account.",
+        message: emailSent
+          ? "Registration successful. Please check your email to verify your account."
+          : "Registration successful. We could not send a verification email at this time. Please try resetting your password to verify your account.",
       },
       { status: 201 }
     );

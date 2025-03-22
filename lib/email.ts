@@ -12,13 +12,6 @@ export const transporter = nodemailer.createTransport({
   connectionTimeout: 10000, // 10 seconds
   greetingTimeout: 10000, // 10 seconds
   socketTimeout: 15000, // 15 seconds
-  dkim: process.env.DKIM_PRIVATE_KEY
-    ? {
-        domainName: process.env.EMAIL_DOMAIN || "buildxpert.ie",
-        keySelector: "default",
-        privateKey: process.env.DKIM_PRIVATE_KEY,
-      }
-    : undefined,
 });
 
 const createEmailLayout = (content: string, unsubscribeLink?: string) => {

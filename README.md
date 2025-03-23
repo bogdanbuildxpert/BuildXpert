@@ -171,3 +171,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Prisma](https://www.prisma.io/)
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
+
+## Update
+
+Last reset to commit 69f821f on: $(date) - Reset for deployment

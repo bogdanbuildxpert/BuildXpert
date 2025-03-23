@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 
+// Create email transporter with increased timeouts for AWS SES
 export const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_SERVER_HOST,
   port: Number(process.env.EMAIL_SERVER_PORT),
@@ -9,9 +10,23 @@ export const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000, // 10 seconds
-  socketTimeout: 15000, // 15 seconds
+  connectionTimeout: 30000, // 30 seconds
+  greetingTimeout: 30000, // 30 seconds
+  socketTimeout: 45000, // 45 seconds
+  debug: process.env.NODE_ENV !== "production", // Enable debug logging in non-production
+  tls: {
+    // Do not fail on invalid certs
+    rejectUnauthorized: false,
+  },
+});
+
+// Verify transporter connection on startup
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error("Email transporter verification failed:", error);
+  } else {
+    console.log("Email server is ready to send messages");
+  }
 });
 
 const createEmailLayout = (content: string, unsubscribeLink?: string) => {
@@ -106,97 +121,91 @@ export const sendVerificationEmail = async (to: string, token: string) => {
   const appUrl = getAppUrl();
   const verificationLink = `${appUrl}/verify-email?token=${token}`;
 
-  try {
-    console.log(`Sending verification email to ${to}`);
-    const { subject, content } = await getProcessedTemplate(
-      "email_verification",
-      {
-        verificationLink,
-      }
-    );
-
-    const mailOptions = {
-      from: {
-        name: process.env.EMAIL_FROM_NAME || "BuildXpert",
-        address: process.env.EMAIL_SERVER_USER || "",
-      },
-      to,
-      subject,
-      text: `Welcome to BuildXpert! Please verify your email by clicking this link: ${verificationLink}`,
-      html: createEmailLayout(content),
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log(`Verification email sent successfully to ${to}`, {
-      messageId: result.messageId,
-    });
-    return result;
-  } catch (error: any) {
-    console.error("Error sending verification email:", error);
-
-    // Check for specific errors
-    if (
-      error.code === "ETIMEDOUT" ||
-      error.code === "ESOCKET" ||
-      error.code === "ECONNECTION"
-    ) {
-      console.error(
-        "Email server connection timeout. Please check your SMTP settings and server status."
-      );
-    }
-
-    // Fallback to hardcoded template if database template fails
+  // Try sending with primary method up to 2 retries
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      console.log(
-        `Attempting fallback method for sending verification email to ${to}`
-      );
-      const appUrl = getAppUrl();
-      const verificationLink = `${appUrl}/verify-email?token=${token}`;
-      const content = `
-        <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
-        <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" 
-             style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-            Verify Email Address
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          If you didn't create an account, you can safely ignore this email.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If the button doesn't work, you can also copy and paste this link into your browser:
-          <br>
-          <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
-        </p>
-      `;
+      console.log(`Sending verification email to ${to} (attempt ${attempt})`);
+
+      // Try to get template from database
+      let subject = "Verify your BuildXpert account";
+      let content = "";
+
+      try {
+        const template = await getProcessedTemplate("email_verification", {
+          verificationLink,
+        });
+        subject = template.subject;
+        content = template.content;
+      } catch (templateError) {
+        console.error(
+          "Could not load email template, using fallback:",
+          templateError
+        );
+        // Use fallback template if database template fails
+        content = `
+          <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
+          <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationLink}" 
+               style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Verify Email Address
+            </a>
+          </div>
+          <p style="color: #666; font-size: 14px;">
+            If you didn't create an account, you can safely ignore this email.
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            If the button doesn't work, you can also copy and paste this link into your browser:
+            <br>
+            <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
+          </p>
+        `;
+      }
 
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || "BuildXpert",
-          address: process.env.EMAIL_SERVER_USER || "",
+          address:
+            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
         },
         to,
-        subject: "Verify your BuildXpert account",
+        subject,
         text: `Welcome to BuildXpert! Please verify your email by clicking this link: ${verificationLink}`,
         html: createEmailLayout(content),
       };
 
       const result = await transporter.sendMail(mailOptions);
-      console.log(
-        `Verification email sent successfully via fallback to ${to}`,
-        { messageId: result.messageId }
-      );
+      console.log(`Verification email sent successfully to ${to}`, {
+        messageId: result.messageId,
+      });
       return result;
-    } catch (fallbackError) {
+    } catch (error: any) {
       console.error(
-        "Fallback verification email sending also failed:",
-        fallbackError
+        `Error sending verification email (attempt ${attempt}):`,
+        error
       );
-      throw new Error(
-        "Failed to send verification email after multiple attempts"
-      );
+
+      // Check for specific errors
+      if (
+        error.code === "ETIMEDOUT" ||
+        error.code === "ESOCKET" ||
+        error.code === "ECONNECTION"
+      ) {
+        console.error(
+          "Email server connection timeout. Please check your SMTP settings and server status."
+        );
+      }
+
+      // If it's the last attempt, throw the error
+      if (attempt === 3) {
+        throw new Error(
+          "Failed to send verification email after multiple attempts"
+        );
+      }
+
+      // Otherwise wait before trying again
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 };
@@ -352,94 +361,94 @@ export const sendPasswordResetEmail = async (to: string, token: string) => {
   const appUrl = getAppUrl();
   const resetLink = `${appUrl}/reset-password?token=${token}`;
 
-  try {
-    console.log(`Sending password reset email to ${to}`);
-    const { subject, content } = await getProcessedTemplate("password_reset", {
-      resetLink,
-    });
-
-    const mailOptions = {
-      from: {
-        name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
-        address: process.env.EMAIL_SERVER_USER || "",
-      },
-      to,
-      subject,
-      text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
-      html: createEmailLayout(content),
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log(`Password reset email sent successfully to ${to}`, {
-      messageId: result.messageId,
-    });
-    return result;
-  } catch (error: any) {
-    console.error("Error sending password reset email:", error);
-
-    // Check for specific errors
-    if (
-      error.code === "ETIMEDOUT" ||
-      error.code === "ESOCKET" ||
-      error.code === "ECONNECTION"
-    ) {
-      console.error(
-        "Email server connection timeout. Please check your SMTP settings and server status."
-      );
-    }
-
-    // Fallback to hardcoded template if database template fails
+  // Try sending with primary method up to 2 retries
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      console.log(
-        `Attempting fallback method for sending password reset email to ${to}`
-      );
-      const appUrl = getAppUrl();
-      const resetLink = `${appUrl}/reset-password?token=${token}`;
-      const content = `
-        <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
-        <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetLink}" 
-             style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-            Reset Password
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          This link will expire in 1 hour for security reasons.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If the button doesn't work, you can also copy and paste this link into your browser:
-          <br>
-          <a href="${resetLink}" style="color: #0070f3; word-break: break-all;">${resetLink}</a>
-        </p>
-      `;
+      console.log(`Sending password reset email to ${to} (attempt ${attempt})`);
+
+      // Try to get template from database
+      let subject = "Reset Your BuildXpert Password";
+      let content = "";
+
+      try {
+        const template = await getProcessedTemplate("password_reset", {
+          resetLink,
+        });
+        subject = template.subject;
+        content = template.content;
+      } catch (templateError) {
+        console.error(
+          "Could not load email template, using fallback:",
+          templateError
+        );
+        // Use fallback template if database template fails
+        content = `
+          <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
+          <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" 
+               style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Reset Password
+            </a>
+          </div>
+          <p style="color: #666; font-size: 14px;">
+            This link will expire in 1 hour for security reasons.
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            If the button doesn't work, you can also copy and paste this link into your browser:
+            <br>
+            <a href="${resetLink}" style="color: #0070f3; word-break: break-all;">${resetLink}</a>
+          </p>
+        `;
+      }
 
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
-          address: process.env.EMAIL_SERVER_USER || "",
+          address:
+            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
         },
         to,
-        subject: "Reset Your BuildXpert Password",
+        subject,
         text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
         html: createEmailLayout(content),
       };
 
       const result = await transporter.sendMail(mailOptions);
-      console.log(
-        `Password reset email sent successfully via fallback to ${to}`,
-        { messageId: result.messageId }
-      );
+      console.log(`Password reset email sent successfully to ${to}`, {
+        messageId: result.messageId,
+      });
       return result;
-    } catch (fallbackError) {
-      console.error("Fallback email sending also failed:", fallbackError);
-      throw new Error(
-        "Failed to send password reset email after multiple attempts"
+    } catch (error: any) {
+      console.error(
+        `Error sending password reset email (attempt ${attempt}):`,
+        error
       );
+
+      // Check for specific errors
+      if (
+        error.code === "ETIMEDOUT" ||
+        error.code === "ESOCKET" ||
+        error.code === "ECONNECTION"
+      ) {
+        console.error(
+          "Email server connection timeout. Please check your SMTP settings and server status."
+        );
+      }
+
+      // If it's the last attempt, throw the error
+      if (attempt === 3) {
+        throw new Error(
+          "Failed to send password reset email after multiple attempts"
+        );
+      }
+
+      // Otherwise wait before trying again
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 };

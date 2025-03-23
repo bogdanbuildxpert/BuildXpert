@@ -4,26 +4,38 @@ import { prisma } from "@/lib/prisma";
 // Create email transporter with increased timeouts for AWS SES
 export const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_SERVER_HOST,
-  port: Number(process.env.EMAIL_SERVER_PORT),
+  port: Number(process.env.EMAIL_SERVER_PORT || 2587), // Try alternative port 2587 if 587 is blocked
   secure: process.env.EMAIL_SERVER_SECURE === "true",
   auth: {
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
-  connectionTimeout: 60000, // 60 seconds (increased from 30)
-  greetingTimeout: 60000, // 60 seconds (increased from 30)
-  socketTimeout: 90000, // 90 seconds (increased from 45)
+  connectionTimeout: 60000, // 60 seconds
+  greetingTimeout: 60000, // 60 seconds
+  socketTimeout: 90000, // 90 seconds
   debug: process.env.NODE_ENV !== "production", // Enable debug logging in non-production
+  logger: process.env.NODE_ENV !== "production", // Enable logger in non-production
   tls: {
     // Do not fail on invalid certs
     rejectUnauthorized: false,
   },
 });
 
-// Verify transporter connection on startup
+// Verify transporter connection on startup and log success/failure
 transporter.verify(function (error, success) {
   if (error) {
     console.error("Email transporter verification failed:", error);
+
+    // Log additional details for troubleshooting
+    console.error("Email server settings:", {
+      host: process.env.EMAIL_SERVER_HOST,
+      port: process.env.EMAIL_SERVER_PORT,
+      secure: process.env.EMAIL_SERVER_SECURE === "true",
+      user: process.env.EMAIL_SERVER_USER
+        ? process.env.EMAIL_SERVER_USER.substring(0, 5) + "..."
+        : "Not set",
+      hasPassword: !!process.env.EMAIL_SERVER_PASSWORD,
+    });
   } else {
     console.log("Email server is ready to send messages");
   }

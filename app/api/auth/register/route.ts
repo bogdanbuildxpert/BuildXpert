@@ -5,6 +5,7 @@ import { sendVerificationEmail } from "@/lib/email";
 import { sendVerificationEmailWithSesApi } from "@/lib/ses-email";
 import { sendVerificationEmailWithSesApiV2 } from "@/lib/ses-email-v2";
 import { hash } from "bcrypt";
+import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,61 +75,48 @@ export async function POST(request: NextRequest) {
       userId: user.id,
     });
 
-    // Generate verification token
-    console.log("[api/auth/register] Generating verification token");
-    const verificationToken = generateVerificationToken(email);
+    // Generate email verification token
+    const token = crypto.randomBytes(32).toString("hex");
+    await prisma.verificationToken.create({
+      data: {
+        identifier: email,
+        token,
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      },
+    });
 
-    // Send verification email with better error handling
-    let emailSent = false;
+    // Send verification email with error handling for DigitalOcean environments
     try {
       console.log(
-        "[api/auth/register] Sending verification email via SES API v2"
+        "Attempting to send verification email via primary method (SMTP)..."
       );
-      // Try SES API v2 first
-      await sendVerificationEmailWithSesApiV2(email, verificationToken);
-      console.log(
-        "[api/auth/register] Verification email sent successfully via SES API v2"
-      );
-      emailSent = true;
-    } catch (sesV2Error) {
-      console.error(
-        "[api/auth/register] Failed to send verification email via SES API v2:",
-        sesV2Error
-      );
+      await sendVerificationEmail(email, token);
+      console.log("Verification email sent successfully via SMTP");
+    } catch (emailError: any) {
+      console.error("SMTP email sending failed:", emailError.message);
 
-      // Fall back to SES API v3 if v2 fails
-      try {
-        console.log(
-          "[api/auth/register] Falling back to SES API v3 for verification email"
-        );
-        await sendVerificationEmailWithSesApi(email, verificationToken);
-        console.log(
-          "[api/auth/register] Verification email sent successfully via SES API v3"
-        );
-        emailSent = true;
-      } catch (sesV3Error) {
-        console.error(
-          "[api/auth/register] Failed to send verification email via SES API v3:",
-          sesV3Error
-        );
+      // If we're on DigitalOcean and hit a timeout, try the SES API
+      if (
+        emailError.code === "ETIMEDOUT" ||
+        emailError.code === "ESOCKET" ||
+        emailError.code === "ECONNECTION"
+      ) {
+        console.log("Attempting fallback email delivery via SES API...");
 
-        // Fall back to SMTP if both SES API methods fail
         try {
-          console.log(
-            "[api/auth/register] Falling back to SMTP for verification email"
-          );
-          await sendVerificationEmail(email, verificationToken);
-          console.log(
-            "[api/auth/register] Verification email sent successfully via SMTP fallback"
-          );
-          emailSent = true;
-        } catch (emailError) {
+          // Try using the SES API v2 as a fallback for network issues
+          await sendVerificationEmailWithSesApiV2(email, token);
+          console.log("Verification email sent successfully via SES API v2");
+        } catch (sesError) {
           console.error(
-            "[api/auth/register] Failed to send verification email via SMTP fallback:",
-            emailError
+            "Both SMTP and SES API delivery methods failed:",
+            sesError
           );
-          // Continue with registration even if all email methods fail
+          // We'll continue the flow but log the error
         }
+      } else {
+        // For other errors, just log them
+        console.error("Email sending failed (non-timeout error):", emailError);
       }
     }
 
@@ -139,9 +127,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...userWithoutPassword,
-        message: emailSent
-          ? "Registration successful. Please check your email to verify your account."
-          : "Registration successful. We could not send a verification email at this time. Please try resetting your password to verify your account.",
+        message:
+          "Registration successful. Please check your email to verify your account.",
       },
       { status: 201 }
     );

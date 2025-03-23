@@ -1,14 +1,22 @@
 import AWS from "aws-sdk";
 
-// Configure AWS SDK v2
-AWS.config.update({
-  region: "eu-west-1", // Match your AWS SES region
-  accessKeyId: process.env.EMAIL_SERVER_USER?.trim(),
-  secretAccessKey: process.env.EMAIL_SERVER_PASSWORD?.trim(),
+// Create an SES client using AWS SDK v2
+const ses = new AWS.SES({
+  apiVersion: "2010-12-01",
+  region: "eu-west-1",
+  // Let AWS SDK use credentials from environment variables or AWS credentials file
+  // This is more robust than hardcoding credentials
 });
 
-// Create an SES client using AWS SDK v2
-const ses = new AWS.SES({ apiVersion: "2010-12-01" });
+interface EmailParams {
+  to: string | string[];
+  subject: string;
+  htmlBody: string;
+  textBody: string;
+  from?: string;
+  fromName?: string;
+  replyTo?: string;
+}
 
 /**
  * Send an email using AWS SES API (SDK v2)
@@ -21,22 +29,14 @@ export async function sendEmailWithSesApiV2({
   from = process.env.EMAIL_FROM,
   fromName = process.env.EMAIL_FROM_NAME,
   replyTo,
-}: {
-  to: string | string[];
-  subject: string;
-  htmlBody: string;
-  textBody: string;
-  from?: string;
-  fromName?: string;
-  replyTo?: string;
-}) {
+}: EmailParams) {
   // Build the email addresses
   const toAddresses = Array.isArray(to) ? to : [to];
   const fromAddress = fromName ? `${fromName} <${from}>` : from;
 
   // Create email parameters
-  const params = {
-    Source: fromAddress,
+  const params: AWS.SES.SendEmailRequest = {
+    Source: fromAddress || "",
     Destination: {
       ToAddresses: toAddresses,
     },
@@ -56,22 +56,27 @@ export async function sendEmailWithSesApiV2({
         },
       },
     },
+    ReplyToAddresses: replyTo ? [replyTo] : undefined,
   };
-
-  // Add Reply-To if provided
-  if (replyTo) {
-    params.ReplyToAddresses = [replyTo];
-  }
 
   console.log(`Sending email via SES API v2 to ${toAddresses.join(", ")}`);
 
   try {
-    // Send the email using the older SDK
+    // Send the email using AWS SDK v2
     const result = await ses.sendEmail(params).promise();
     console.log("Email sent successfully with SES API v2:", result.MessageId);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending email with SES API v2:", error);
+
+    // Log details for debugging
+    if (error.code === "SignatureDoesNotMatch") {
+      console.error("Signature mismatch - this could be due to:");
+      console.error("1. Issues with credentials");
+      console.error("2. Time synchronization");
+      console.error("3. Missing permissions");
+    }
+
     throw error;
   }
 }

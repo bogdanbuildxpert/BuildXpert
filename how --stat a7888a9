@@ -1,0 +1,24 @@
+[33mcommit a7888a9dfb7734251492d4a84b3b763c6d7e99c9[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: bogdanhutuleac <bogdanhutuleac@outlook.com>
+Date:   Sat Mar 22 18:13:30 2025 +0000
+
+    Remove manual DKIM configuration in favor of AWS SES Easy DKIM
+
+[1mdiff --git a/lib/email.ts b/lib/email.ts[m
+[1mindex 3bec9a7..3f0130c 100644[m
+[1m--- a/lib/email.ts[m
+[1m+++ b/lib/email.ts[m
+[36m@@ -12,13 +12,6 @@[m [mexport const transporter = nodemailer.createTransport({[m
+   connectionTimeout: 10000, // 10 seconds[m
+   greetingTimeout: 10000, // 10 seconds[m
+   socketTimeout: 15000, // 15 seconds[m
+[31m-  dkim: process.env.DKIM_PRIVATE_KEY[m
+[31m-    ? {[m
+[31m-        domainName: process.env.EMAIL_DOMAIN || "buildxpert.ie",[m
+[31m-        keySelector: "default",[m
+[31m-        privateKey: process.env.DKIM_PRIVATE_KEY,[m
+[31m-      }[m
+[31m-    : undefined,[m
+ });[m
+ [m
+ const createEmailLayout = (content: string, unsubscribeLink?: string) => {[m

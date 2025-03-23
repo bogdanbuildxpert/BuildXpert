@@ -1,0 +1,434 @@
+// Load environment variables from .env file
+require("dotenv").config();
+
+const { createServer } = require("http");
+const { parse } = require("url");
+const next = require("next");
+const { Server } = require("socket.io");
+const { Client } = require("pg");
+const { PrismaClient } = require("@prisma/client");
+
+// Initialize Next.js
+const dev = process.env.NODE_ENV !== "production";
+const app = next({ dev });
+const handle = app.getRequestHandler();
+
+// Create Prisma client
+const prisma = new PrismaClient();
+
+// PostgreSQL notification client
+let pgClient = null;
+
+// Log to show we're starting
+console.log(
+  "Starting server with Socket.IO and PostgreSQL LISTEN/NOTIFY support..."
+);
+
+// Connect to PostgreSQL and set up LISTEN
+async function setupPgNotify() {
+  try {
+    // Create a dedicated client for LISTEN/NOTIFY
+    pgClient = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
+    });
+
+    await pgClient.connect();
+    console.log("Connected to PostgreSQL for LISTEN/NOTIFY");
+
+    // Set up listeners for notifications
+    await pgClient.query("LISTEN new_message");
+    console.log("Listening for new_message notifications");
+
+    await pgClient.query("LISTEN messages_read");
+    console.log("Listening for messages_read notifications");
+
+    return true;
+  } catch (error) {
+    console.error("Error setting up PostgreSQL notifications:", error);
+    return false;
+  }
+}
+
+// Helper function to get notifications and unread count
+async function getNotificationsForUser(userId) {
+  try {
+    if (!userId) {
+      console.error("[SERVER] No userId provided for notifications");
+      return { notifications: [], unreadCount: 0 };
+    }
+
+    console.log(`[SERVER] Fetching notifications for user ${userId}`);
+
+    // Get unread messages count
+    const unreadCount = await prisma.message.count({
+      where: {
+        receiverId: userId,
+        isRead: false,
+      },
+    });
+
+    // Get notifications (latest 10 messages)
+    const notifications = await prisma.message.findMany({
+      where: {
+        receiverId: userId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 10,
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        job: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    console.log(
+      `[SERVER] Found ${notifications.length} notifications and ${unreadCount} unread messages for user ${userId}`
+    );
+
+    return {
+      notifications,
+      unreadCount,
+    };
+  } catch (error) {
+    console.error("[SERVER] Error fetching notifications:", error);
+    return { notifications: [], unreadCount: 0 };
+  }
+}
+
+// Prepare Next.js
+app.prepare().then(async () => {
+  // Create HTTP server
+  const server = createServer((req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      handle(req, res, parsedUrl);
+    } catch (error) {
+      console.error("Error handling request:", error);
+      res.statusCode = 500;
+      res.end("Internal Server Error");
+    }
+  });
+
+  // Create Socket.IO server with more robust configuration and error handling
+  const io = new Server(server, {
+    path: "/socket.io/",
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+    transports: ["polling", "websocket"],
+    pingInterval: 10000,
+    pingTimeout: 5000,
+    maxHttpBufferSize: 1e6, // 1MB
+    connectTimeout: 45000,
+  });
+
+  // Add error handling for Socket.IO
+  io.engine.on("connection_error", (err) => {
+    console.error("Socket.IO connection error:", err);
+  });
+
+  // Add global error handling
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    // Don't exit the process, just log the error
+  });
+
+  // Enable admin UI
+  let lastClientCount = 0;
+
+  // Track connected clients
+  const connectedClients = new Map();
+
+  // Set up PostgreSQL notifications
+  const pgSetupSuccess = await setupPgNotify();
+  if (pgSetupSuccess && pgClient) {
+    // Listen for PostgreSQL notifications
+    pgClient.on("notification", (msg) => {
+      try {
+        console.log(`[PG] Received ${msg.channel} notification`);
+
+        if (!msg.payload) return;
+
+        const payload = JSON.parse(msg.payload);
+
+        if (msg.channel === "new_message") {
+          console.log(
+            `[PG] Broadcasting new message to recipient: ${payload.receiverId}`
+          );
+          io.to(payload.receiverId).emit("new_message", payload);
+
+          // Also notify the sender
+          if (payload.senderId) {
+            io.to(payload.senderId).emit("new_message", payload);
+          }
+        } else if (msg.channel === "messages_read") {
+          console.log(
+            `[PG] Broadcasting messages_read event to sender: ${payload.senderId}`
+          );
+          if (payload.senderId) {
+            io.to(payload.senderId).emit("messages_read", {
+              jobId: payload.jobId,
+              readBy: payload.readBy,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("[PG] Error processing notification:", error);
+      }
+    });
+
+    // Handle PostgreSQL connection errors
+    pgClient.on("error", (err) => {
+      console.error("[PG] Database connection error:", err);
+      // Attempt to reconnect
+      setTimeout(setupPgNotify, 5000);
+    });
+  }
+
+  // Socket.IO connection handler with detailed logging
+  io.on("connection", (socket) => {
+    console.log(`[SOCKET] Client connected: ${socket.id}`);
+
+    connectedClients.set(socket.id, {
+      id: socket.id,
+      connectedAt: new Date(),
+      rooms: [],
+      userId: null,
+    });
+
+    const count = io.engine.clientsCount;
+    console.log(`[SOCKET] Total clients: ${count}`);
+
+    // Log when client counts change
+    if (count !== lastClientCount) {
+      console.log(
+        `[SOCKET] Client count changed: ${lastClientCount} -> ${count}`
+      );
+      lastClientCount = count;
+    }
+
+    // Handle user joining a room (for private messaging)
+    socket.on("join", (userId) => {
+      if (!userId) {
+        console.log(`[SOCKET] Join event received but no userId provided`);
+        return;
+      }
+
+      console.log(
+        `[SOCKET] User ${userId} joining room with socket ID ${socket.id}`
+      );
+
+      socket.join(userId);
+
+      // Update client tracking
+      const clientInfo = connectedClients.get(socket.id);
+      if (clientInfo) {
+        clientInfo.rooms.push(userId);
+        clientInfo.userId = userId;
+        console.log(
+          `[SOCKET] Updated client info for ${
+            socket.id
+          }: userId=${userId}, rooms=${clientInfo.rooms.join(",")}`
+        );
+      }
+
+      console.log(
+        `[SOCKET] User ${userId} joined room with socket ID ${socket.id}`
+      );
+
+      // Send a confirmation to the client
+      socket.emit("joined", {
+        status: "success",
+        message: "Successfully joined room",
+        userId: userId,
+      });
+
+      // Trigger notification load immediately after join
+      try {
+        getNotificationsForUser(userId).then(
+          ({ notifications, unreadCount }) => {
+            console.log(
+              `[SOCKET] Auto-sending initial notifications after join for user ${userId} (${notifications.length} messages, ${unreadCount} unread)`
+            );
+
+            socket.emit("initial_notifications", {
+              notifications,
+              unreadCount,
+            });
+          }
+        );
+      } catch (err) {
+        console.error(
+          `[SOCKET] Error auto-sending notifications after join:`,
+          err
+        );
+      }
+    });
+
+    // Handle request for initial notifications (replacing API calls)
+    socket.on("request_initial_notifications", async () => {
+      const clientInfo = connectedClients.get(socket.id);
+
+      if (!clientInfo || !clientInfo.userId) {
+        console.log(
+          `[SOCKET] Client ${socket.id} requested notifications but has no userId. Client info:`,
+          clientInfo
+        );
+
+        // Try to get userId from rooms
+        const rooms = Array.from(socket.rooms).filter(
+          (room) => room !== socket.id
+        );
+        if (rooms.length > 0) {
+          const possibleUserId = rooms[0]; // Use the first room as userId
+          console.log(
+            `[SOCKET] Found possible userId ${possibleUserId} from rooms`
+          );
+
+          // Update the client info
+          if (clientInfo) {
+            clientInfo.userId = possibleUserId;
+            console.log(`[SOCKET] Updated client userId to ${possibleUserId}`);
+          }
+
+          // Proceed with this userId
+          try {
+            const { notifications, unreadCount } =
+              await getNotificationsForUser(possibleUserId);
+
+            console.log(
+              `[SOCKET] Sending initial notifications to user ${possibleUserId} from room (${notifications.length} messages, ${unreadCount} unread)`
+            );
+
+            socket.emit("initial_notifications", {
+              notifications,
+              unreadCount,
+            });
+          } catch (error) {
+            console.error(
+              `[SOCKET] Error getting notifications for user ${possibleUserId} from room:`,
+              error
+            );
+          }
+        } else {
+          console.log(
+            `[SOCKET] No userId found in rooms for client ${socket.id}`
+          );
+        }
+        return;
+      }
+
+      const userId = clientInfo.userId;
+      console.log(
+        `[SOCKET] Handling request_initial_notifications for user ${userId}`
+      );
+
+      try {
+        const { notifications, unreadCount } = await getNotificationsForUser(
+          userId
+        );
+
+        console.log(
+          `[SOCKET] Sending ${notifications.length} notifications and unread count ${unreadCount} to user ${userId}`
+        );
+
+        // Send notifications data to client
+        socket.emit("initial_notifications", {
+          notifications,
+          unreadCount,
+        });
+
+        console.log(`[SOCKET] Sent initial notifications to user ${userId}`);
+      } catch (error) {
+        console.error(`[SOCKET] Error sending initial notifications:`, error);
+      }
+    });
+
+    // Handle message sending
+    socket.on("send_message", (message) => {
+      console.log(`[SOCKET] Message received from ${socket.id}:`, message);
+      if (message.senderId && message.receiverId) {
+        io.to(message.receiverId).emit("new_message", message);
+        console.log(`[SOCKET] Message sent to ${message.receiverId}`);
+      }
+    });
+
+    // Handle messages being marked as read
+    socket.on("mark_read", (data) => {
+      console.log(`[SOCKET] Mark read event:`, data);
+      if (data.jobId && data.readBy && data.senderId) {
+        io.to(data.senderId).emit("messages_read", {
+          jobId: data.jobId,
+          readBy: data.readBy,
+        });
+        console.log(
+          `[SOCKET] Marked as read notification sent to ${data.senderId}`
+        );
+      }
+    });
+
+    // Handle disconnect
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `[SOCKET] Client disconnected: ${socket.id}, reason: ${reason}`
+      );
+      connectedClients.delete(socket.id);
+
+      const count = io.engine.clientsCount;
+      console.log(`[SOCKET] Total clients after disconnect: ${count}`);
+
+      if (count !== lastClientCount) {
+        console.log(
+          `[SOCKET] Client count changed: ${lastClientCount} -> ${count}`
+        );
+        lastClientCount = count;
+      }
+    });
+  });
+
+  // Setup heartbeat to check socket server status
+  setInterval(() => {
+    const count = io.engine.clientsCount;
+    console.log(`[SOCKET] Heartbeat - Connected clients: ${count}`);
+  }, 30000);
+
+  // Handle cleanup before exit
+  process.on("SIGINT", async () => {
+    console.log("Shutting down gracefully...");
+    if (pgClient) {
+      await pgClient.end();
+      console.log("PostgreSQL connection closed");
+    }
+    await prisma.$disconnect();
+    console.log("Prisma client disconnected");
+    process.exit(0);
+  });
+
+  // Start the server
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, (err) => {
+    if (err) throw err;
+    console.log(`> Ready on http://localhost:${PORT}`);
+    console.log(`> Socket.IO server running on port ${PORT}`);
+    console.log(`> Environment: ${dev ? "development" : "production"}`);
+  });
+});

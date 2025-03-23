@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generatePasswordResetToken } from "@/lib/token";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { sendPasswordResetEmailWithSesApi } from "@/lib/ses-email";
+import { sendPasswordResetEmailWithSesApiV2 } from "@/lib/ses-email-v2";
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,24 +46,57 @@ export async function POST(request: NextRequest) {
     // Generate password reset token
     const resetToken = generatePasswordResetToken(email);
 
-    // Send password reset email with better error handling
+    // Try in sequence: SES API v2 -> SES API v3 -> SMTP
     try {
-      await sendPasswordResetEmail(email, resetToken);
+      // First try: AWS SDK v2 implementation (often more reliable with credentials)
+      console.log("Attempting to send email using SES API v2");
+      await sendPasswordResetEmailWithSesApiV2(email, resetToken);
+      console.log("Password reset email sent successfully using SES API v2");
 
       return NextResponse.json(
         { message: "Password reset instructions sent to your email" },
         { status: 200 }
       );
-    } catch (emailError) {
-      console.error("Failed to send password reset email:", emailError);
+    } catch (sesV2Error) {
+      console.error("Failed to send email with SES API v2:", sesV2Error);
 
-      return NextResponse.json(
-        {
-          error:
-            "We're experiencing issues with our email service. Please try again later or contact support if the problem persists.",
-        },
-        { status: 500 }
-      );
+      // Second try: AWS SDK v3 implementation
+      try {
+        console.log("Falling back to SES API v3...");
+        await sendPasswordResetEmailWithSesApi(email, resetToken);
+        console.log("Password reset email sent successfully using SES API v3");
+
+        return NextResponse.json(
+          { message: "Password reset instructions sent to your email" },
+          { status: 200 }
+        );
+      } catch (sesV3Error) {
+        console.error("Failed to send email with SES API v3:", sesV3Error);
+
+        // Last resort: Try SMTP method
+        try {
+          console.log("Falling back to SMTP method...");
+          await sendPasswordResetEmail(email, resetToken);
+          console.log(
+            "Password reset email sent successfully using SMTP fallback"
+          );
+
+          return NextResponse.json(
+            { message: "Password reset instructions sent to your email" },
+            { status: 200 }
+          );
+        } catch (smtpError) {
+          console.error("Failed to send email with all methods:", smtpError);
+
+          return NextResponse.json(
+            {
+              error:
+                "We're experiencing issues with our email service. Please try again later or contact support if the problem persists.",
+            },
+            { status: 500 }
+          );
+        }
+      }
     }
   } catch (error) {
     console.error("Error in forgot password:", error);

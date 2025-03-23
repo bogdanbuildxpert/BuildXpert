@@ -10,9 +10,9 @@ export const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
-  connectionTimeout: 30000, // 30 seconds
-  greetingTimeout: 30000, // 30 seconds
-  socketTimeout: 45000, // 45 seconds
+  connectionTimeout: 60000, // 60 seconds (increased from 30)
+  greetingTimeout: 60000, // 60 seconds (increased from 30)
+  socketTimeout: 90000, // 90 seconds (increased from 45)
   debug: process.env.NODE_ENV !== "production", // Enable debug logging in non-production
   tls: {
     // Do not fail on invalid certs

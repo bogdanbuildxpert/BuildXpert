@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generateVerificationToken } from "@/lib/token";
 import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmailWithSesApi } from "@/lib/ses-email";
+import { sendVerificationEmailWithSesApiV2 } from "@/lib/ses-email-v2";
 import { hash } from "bcrypt";
 
 export async function POST(request: NextRequest) {
@@ -79,16 +81,55 @@ export async function POST(request: NextRequest) {
     // Send verification email with better error handling
     let emailSent = false;
     try {
-      console.log("[api/auth/register] Sending verification email");
-      await sendVerificationEmail(email, verificationToken);
-      console.log("[api/auth/register] Verification email sent successfully");
-      emailSent = true;
-    } catch (emailError) {
-      console.error(
-        "[api/auth/register] Failed to send verification email:",
-        emailError
+      console.log(
+        "[api/auth/register] Sending verification email via SES API v2"
       );
-      // Continue with registration even if email fails
+      // Try SES API v2 first
+      await sendVerificationEmailWithSesApiV2(email, verificationToken);
+      console.log(
+        "[api/auth/register] Verification email sent successfully via SES API v2"
+      );
+      emailSent = true;
+    } catch (sesV2Error) {
+      console.error(
+        "[api/auth/register] Failed to send verification email via SES API v2:",
+        sesV2Error
+      );
+
+      // Fall back to SES API v3 if v2 fails
+      try {
+        console.log(
+          "[api/auth/register] Falling back to SES API v3 for verification email"
+        );
+        await sendVerificationEmailWithSesApi(email, verificationToken);
+        console.log(
+          "[api/auth/register] Verification email sent successfully via SES API v3"
+        );
+        emailSent = true;
+      } catch (sesV3Error) {
+        console.error(
+          "[api/auth/register] Failed to send verification email via SES API v3:",
+          sesV3Error
+        );
+
+        // Fall back to SMTP if both SES API methods fail
+        try {
+          console.log(
+            "[api/auth/register] Falling back to SMTP for verification email"
+          );
+          await sendVerificationEmail(email, verificationToken);
+          console.log(
+            "[api/auth/register] Verification email sent successfully via SMTP fallback"
+          );
+          emailSent = true;
+        } catch (emailError) {
+          console.error(
+            "[api/auth/register] Failed to send verification email via SMTP fallback:",
+            emailError
+          );
+          // Continue with registration even if all email methods fail
+        }
+      }
     }
 
     // Remove password from response

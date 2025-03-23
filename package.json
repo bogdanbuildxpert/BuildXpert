@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
+    "@aws-sdk/client-ses": "^3.772.0",
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "5.10.2",
     "@radix-ui/react-accordion": "^1.2.2",
@@ -67,6 +68,7 @@
     "@types/socket.io": "^3.0.1",
     "@types/socket.io-client": "^1.4.36",
     "autoprefixer": "^10.4.20",
+    "aws-sdk": "^2.1692.0",
     "bcrypt": "^5.1.1",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",

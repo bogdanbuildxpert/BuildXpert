@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
       });
 
       if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Invalid reset request" },
+          { status: 404 }
+        );
       }
 
       // Skip password reset for Google accounts (empty password)

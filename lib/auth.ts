@@ -52,7 +52,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user) {
-            throw new Error("User not found");
+            throw new Error("Invalid credentials");
           }
 
           // For users created with Google, they might not have a password
@@ -66,7 +66,7 @@ export const authOptions: NextAuthOptions = {
           );
 
           if (!isPasswordValid) {
-            throw new Error("Invalid password");
+            throw new Error("Invalid credentials");
           }
 
           return {

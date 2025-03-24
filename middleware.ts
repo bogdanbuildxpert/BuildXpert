@@ -149,25 +149,31 @@ export async function middleware(request: NextRequest) {
 
   // If it's an auth-protected route and the user is not authenticated, redirect to login
   if (isAuthProtectedRoute && !isAuthenticated) {
-    // Check if we just came from login by looking for a just_authenticated parameter
-    const justAuthenticated =
-      request.nextUrl.searchParams.has("just_authenticated");
-
-    // If just authenticated, let the request go through and handle auth client-side
-    if (justAuthenticated) {
-      console.log(`Allowing access to ${path} after recent authentication`);
-      return NextResponse.next();
-    }
-
     // Create the URL to redirect to
     const redirectUrl = new URL("/login", request.url);
     // Add the original URL as a parameter so we can redirect back after login
     redirectUrl.searchParams.set("from", path);
 
+    // Add a cache header to prevent browser caching of the redirect
+    const response = NextResponse.redirect(redirectUrl);
+    response.headers.set("Cache-Control", "no-store, must-revalidate");
+    response.headers.set("Pragma", "no-cache");
+
     console.log(
       `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}`
     );
-    return NextResponse.redirect(redirectUrl);
+    return response;
+  }
+
+  // For authenticated routes, add cache control headers
+  if (isAuthProtectedRoute) {
+    const response = NextResponse.next();
+    response.headers.set(
+      "Cache-Control",
+      "private, no-cache, no-store, must-revalidate"
+    );
+    response.headers.set("Pragma", "no-cache");
+    return response;
   }
 
   console.log(`Allowing access to ${path}`);

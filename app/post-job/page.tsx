@@ -120,27 +120,38 @@ export default function PostJobPage() {
 
   // Add a simplified useEffect to force a refresh of auth state
   useEffect(() => {
-    // Check if the user is authenticated, and if not, redirect to login
-    if (forceRefresh && typeof forceRefresh === "function") {
-      forceRefresh();
-    }
+    const checkAuth = async () => {
+      // If we're not in loading state and there's no user, redirect to login
+      if (!authLoading && !user) {
+        // Add state parameter to track the redirect
+        router.push("/login?redirect=/post-job&state=" + Date.now());
+        return;
+      }
 
-    // If we're not in loading state and there's no user, redirect to login
-    if (!authLoading && !user) {
-      router.push("/login?redirect=/post-job");
-    }
-  }, [authLoading, user, router, forceRefresh]);
+      // If we have a user, prefill the email
+      if (user?.email && !formData.email) {
+        setFormData((prev) => ({
+          ...prev,
+          email: user.email,
+        }));
+      }
+    };
+
+    checkAuth();
+  }, [authLoading, user, router, formData.email]);
 
   // Update CSRF token on component mount - simplified
   useEffect(() => {
     const updateCsrfToken = async () => {
-      try {
-        const token = await getCsrfToken();
-        if (token) {
-          csrfTokenRef.current = token;
+      if (!csrfTokenRef.current) {
+        try {
+          const token = await getCsrfToken();
+          if (token) {
+            csrfTokenRef.current = token;
+          }
+        } catch (error) {
+          console.error("Error fetching CSRF token:", error);
         }
-      } catch (error) {
-        console.error("Error fetching CSRF token:", error);
       }
     };
 
@@ -154,60 +165,6 @@ export default function PostJobPage() {
       isMountedRef.current = false;
     };
   }, []);
-
-  // Enhanced auth check that ensures session is refreshed
-  useEffect(() => {
-    const checkAndRefreshAuth = async () => {
-      console.log("Auth status check:", {
-        authContextUser: !!user,
-        nextAuthSession: sessionStatus,
-        authLoading,
-      });
-
-      // Only redirect if we're confident the user is not authenticated
-      if (!authLoading && !user && sessionStatus === "unauthenticated") {
-        console.log("User not authenticated, redirecting to login");
-        router.push("/login?redirect=/post-job");
-      } else if (user || sessionStatus === "authenticated") {
-        // Only try to refresh once if needed, don't do it repeatedly
-        if (sessionStatus === "authenticated" && !formData.email) {
-          // Prefill email if available from authenticated user
-          if (user?.email) {
-            setFormData((prev) => ({
-              ...prev,
-              email: user.email,
-            }));
-          } else if (session.user?.email) {
-            setFormData((prev) => ({
-              ...prev,
-              email: session.user.email as string,
-            }));
-          }
-        }
-      }
-    };
-
-    checkAndRefreshAuth();
-  }, [
-    user,
-    authLoading,
-    router,
-    sessionStatus,
-    session?.user?.email,
-    formData.email,
-  ]);
-
-  // Add keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && e.ctrlKey && !isLastSection()) {
-        handleNextSection();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [activeAccordion]);
 
   // Map fields to their accordion sections
   const fieldToAccordionMap: Record<string, string> = {
@@ -445,54 +402,45 @@ Additional Notes: ${formData.additionalNotes}
           furnitureMoving: formData.furnitureMoving,
           scaffolding: formData.scaffolding,
           additionalNotes: formData.additionalNotes,
-          // Include all images, no need to filter placeholder images anymore
           images: formData.images,
           startDate: startDate ? startDate.toISOString() : null,
           endDate: endDate ? endDate.toISOString() : null,
-          submissionAttempt: submissionAttemptRef.current, // Add attempt count to track duplicate submissions
+          submissionAttempt: submissionAttemptRef.current,
         },
       };
 
-      console.log("Submitting job data:", jobData);
-      console.log(
-        "Auth status:",
-        user ? "Authenticated" : "Not authenticated",
-        "Session status:",
-        sessionStatus
-      );
-
-      // Get the CSRF token from NextAuth
-      const csrfToken = await getCsrfToken();
-      console.log("CSRF token present:", csrfToken ? "Yes" : "No");
+      // Get the CSRF token
+      const csrfToken = csrfTokenRef.current || (await getCsrfToken());
 
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Include CSRF token if available
           ...(csrfToken && { "csrf-token": csrfToken }),
         },
         body: JSON.stringify(jobData),
         credentials: "include", // Include cookies in the request
       });
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API error response:", errorData);
 
         if (response.status === 401) {
-          // Unauthorized - redirect to login
-          toast.error("Your session has expired. Please log in again.");
-          router.push("/login?redirect=/post-job");
+          // Clear any stale auth state
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem("user");
+            window.sessionStorage.removeItem("user");
+          }
+
+          toast.error("Please log in again to continue");
+          router.push("/login?redirect=/post-job&expired=true");
           return;
         }
+
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const responseData = await response.json();
-      console.log("Job posted successfully:", responseData);
 
       // Only continue if component is still mounted
       if (isMountedRef.current) {
@@ -502,14 +450,12 @@ Additional Notes: ${formData.additionalNotes}
     } catch (error) {
       console.error("Error posting job:", error);
 
-      // Only show error if component is still mounted
       if (isMountedRef.current) {
         toast.error(
           error instanceof Error ? error.message : "Failed to post job"
         );
       }
     } finally {
-      // Only update state if component is still mounted
       if (isMountedRef.current) {
         setIsLoading(false);
       }

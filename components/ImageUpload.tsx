@@ -11,67 +11,42 @@ import { toast } from "sonner";
 
 interface ImageUploadProps {
   onImageUpload: (imageUrl: string) => void;
-  initialImage?: string;
+  onRemoveImage: (imageUrl: string) => void;
+  existingImages: string[];
   maxImages?: number;
   bucket?: string;
   path?: string;
   className?: string;
-  existingImages?: string[];
-  onRemoveImage?: (imageUrl: string) => void;
 }
 
 export default function ImageUpload({
   onImageUpload,
-  initialImage,
+  onRemoveImage,
+  existingImages,
   maxImages = 10,
   bucket = "app-images",
   path = "",
   className = "",
-  existingImages = [],
-  onRemoveImage,
 }: ImageUploadProps) {
-  // Use refs to avoid rerenders during file uploads
-  const uploadingRef = useRef(false);
+  // Track upload status but not the images themselves
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<{
+    [key: string]: boolean;
+  }>({});
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [images, setImages] = useState<
-    { file: File | null; preview: string; uploading: boolean; error?: string }[]
-  >([]);
-
-  // Initialize with initial image if provided - only run once
-  useEffect(() => {
-    if (initialImage && images.length === 0) {
-      setImages([{ file: null, preview: initialImage, uploading: false }]);
-    }
-
-    // Cleanup function to revoke object URLs on unmount
-    return () => {
-      images.forEach((image) => {
-        if (image.preview && !image.preview.startsWith("http")) {
-          revokeImagePreview(image.preview);
-        }
-      });
-    };
-  }, [initialImage]); // Only depend on initialImage, not images
 
   const uploadToSupabase = useCallback(
-    async (file: File, index: number) => {
+    async (file: File) => {
+      const fileId = `${file.name}-${Date.now()}`;
       try {
         // Clear any previous errors
         setUploadError(null);
 
-        // Update image state to show it's uploading
-        setImages((prev) => {
-          const updated = [...prev];
-          if (index < updated.length) {
-            updated[index] = {
-              ...updated[index],
-              uploading: true,
-              error: undefined,
-            };
-          }
-          return updated;
-        });
+        // Update uploading status for this file
+        setUploadingFiles((prev) => ({
+          ...prev,
+          [fileId]: true,
+        }));
 
         // Determine which bucket to use based on the path or URL
         // If the path contains 'job', use job-images bucket
@@ -116,20 +91,6 @@ export default function ImageUpload({
         if (url) {
           console.log(`Upload successful. Image URL: ${url}`);
 
-          // Update the image in state
-          setImages((prev) => {
-            const updated = [...prev];
-            if (index < updated.length) {
-              updated[index] = {
-                file: null,
-                preview: url,
-                uploading: false,
-                error: undefined,
-              };
-            }
-            return updated;
-          });
-
           // Call the callback with uploaded URL
           onImageUpload(url);
           return url;
@@ -142,20 +103,15 @@ export default function ImageUpload({
           error instanceof Error ? error.message : "Upload failed";
 
         toast.error(`Failed to upload ${file.name}: ${errorMessage}`);
-
-        setImages((prev) => {
-          const updated = [...prev];
-          if (index < updated.length) {
-            updated[index] = {
-              ...updated[index],
-              uploading: false,
-              error: errorMessage,
-            };
-          }
+        setUploadError(errorMessage);
+        return null;
+      } finally {
+        // Clear upload status for this file
+        setUploadingFiles((prev) => {
+          const updated = { ...prev };
+          delete updated[fileId];
           return updated;
         });
-
-        return null;
       }
     },
     [bucket, path, onImageUpload]
@@ -173,14 +129,14 @@ export default function ImageUpload({
         console.log(`Processing ${files.length} file(s) for upload`);
 
         // Check if adding these files would exceed the maximum
-        if (images.length + files.length > maxImages) {
+        if (existingImages.length + files.length > maxImages) {
           toast.error(`You can only upload a maximum of ${maxImages} images`);
           setIsUploading(false);
           return;
         }
 
         // Process each selected file
-        const newImagesPromises = files.map(async (file) => {
+        const uploadPromises = files.map(async (file) => {
           try {
             console.log(
               `Processing file: ${file.name}, type: ${file.type}, size: ${(
@@ -200,10 +156,8 @@ export default function ImageUpload({
               `Compressed size: ${(compressedFile.size / 1024).toFixed(2)}KB`
             );
 
-            // Create a preview URL
-            const preview = createImagePreview(compressedFile);
-
-            return { file: compressedFile, preview, uploading: true };
+            // Upload directly
+            return await uploadToSupabase(compressedFile);
           } catch (error) {
             console.error(`Error processing file ${file.name}:`, error);
             const errorMsg =
@@ -213,27 +167,8 @@ export default function ImageUpload({
           }
         });
 
-        const results = await Promise.all(newImagesPromises);
-        const validImages = results.filter(
-          (
-            result
-          ): result is { file: File; preview: string; uploading: boolean } =>
-            result !== null
-        );
-
-        console.log(`${validImages.length} file(s) ready for upload`);
-
-        // Update state with new images
-        const startIndex = images.length;
-        setImages((prev) => [...prev, ...validImages]);
-
-        // Automatically upload the new images
-        for (let i = 0; i < validImages.length; i++) {
-          if (validImages[i].file) {
-            console.log(`Starting upload for file ${i + 1}`);
-            await uploadToSupabase(validImages[i].file, startIndex + i);
-          }
-        }
+        await Promise.all(uploadPromises);
+        console.log("All uploads completed");
 
         // Reset the input value so the same file can be selected again
         e.target.value = "";
@@ -247,132 +182,87 @@ export default function ImageUpload({
         setIsUploading(false);
       }
     },
-    [images, maxImages, uploadToSupabase]
-  );
-
-  const removeImage = useCallback((index: number) => {
-    setImages((prev) => {
-      const newImages = [...prev];
-
-      // Revoke the object URL if it's a local preview
-      if (
-        newImages[index].preview &&
-        !newImages[index].preview.startsWith("http")
-      ) {
-        revokeImagePreview(newImages[index].preview);
-      }
-
-      newImages.splice(index, 1);
-      return newImages;
-    });
-  }, []);
-
-  // Retry a failed upload
-  const retryUpload = useCallback(
-    (index: number) => {
-      const image = images[index];
-      if (image && image.file) {
-        uploadToSupabase(image.file, index);
-      }
-    },
-    [images, uploadToSupabase]
+    [existingImages, maxImages, uploadToSupabase]
   );
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {uploadError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center mb-4">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-          <p className="text-sm">{uploadError}</p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-4">
-        {images.map((image, index) => (
+      <div className="grid grid-cols-3 gap-2">
+        {/* Display existing images */}
+        {existingImages.map((imageUrl, index) => (
           <div
-            key={index}
-            className={`relative w-32 h-32 border rounded-md overflow-hidden group ${
-              image.error ? "border-red-300" : ""
-            }`}
+            key={`${imageUrl}-${index}`}
+            className="relative rounded-md overflow-hidden border aspect-square"
           >
-            <Image
-              src={image.preview}
-              alt={`Preview ${index + 1}`}
-              fill
-              className={`object-cover ${image.uploading ? "opacity-50" : ""} ${
-                image.error ? "opacity-30" : ""
-              }`}
+            <img
+              src={imageUrl}
+              alt={`Uploaded image ${index + 1}`}
+              className="w-full h-full object-cover"
             />
-            {image.uploading && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg
-                  className="animate-spin h-6 w-6 text-primary"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-            )}
-            {image.error && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-red-500 mb-1" />
-                <button
-                  onClick={() => retryUpload(index)}
-                  className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
             <button
               type="button"
-              onClick={() => removeImage(index)}
-              className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => onRemoveImage(imageUrl)}
+              className="absolute top-1 right-1 bg-black/70 hover:bg-black p-1 rounded-full"
               aria-label="Remove image"
-              disabled={image.uploading}
             >
-              <X size={16} />
+              <X className="h-4 w-4 text-white" />
             </button>
           </div>
         ))}
 
-        {images.length < maxImages && (
+        {/* Add image button */}
+        {existingImages.length < maxImages && (
           <label
-            className={`flex items-center justify-center w-32 h-32 border border-dashed rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
-              isUploading ? "opacity-50" : ""
-            }`}
+            htmlFor="image-upload"
+            className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-md flex flex-col items-center justify-center cursor-pointer aspect-square hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
           >
-            <div className="flex flex-col items-center">
-              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-              <span className="text-xs mt-1 text-muted-foreground text-center">
-                {isUploading ? "Uploading..." : "Add Image"}
-                <span className="block text-[10px] opacity-80">Max 5MB</span>
+            <div className="flex flex-col items-center justify-center p-4">
+              <ImageIcon className="w-8 h-8 text-gray-400 dark:text-gray-600 mb-2" />
+              <span className="text-xs text-center text-gray-500 dark:text-gray-400">
+                Add Image
+                <br />
+                <span className="text-[10px]">Max 5MB</span>
               </span>
             </div>
             <input
+              id="image-upload"
               type="file"
+              className="hidden"
               accept="image/*"
               onChange={handleImageChange}
-              className="hidden"
-              disabled={isUploading}
+              disabled={isUploading || existingImages.length >= maxImages}
+              multiple
             />
           </label>
         )}
       </div>
+
+      {/* Uploading indicator */}
+      {isUploading && (
+        <div className="w-full flex items-center justify-center py-2">
+          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent"></div>
+            <span>Uploading...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error message */}
+      {uploadError && (
+        <div className="w-full flex items-center text-red-500 space-x-1 text-sm p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
+          <AlertCircle className="h-4 w-4" />
+          <span>{uploadError}</span>
+        </div>
+      )}
+
+      {/* Upload instructions */}
+      {!isUploading && !uploadError && existingImages.length < maxImages && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {existingImages.length > 0
+            ? `${existingImages.length} of ${maxImages} images uploaded`
+            : `Add up to ${maxImages} images`}
+        </p>
+      )}
     </div>
   );
 }

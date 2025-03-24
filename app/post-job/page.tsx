@@ -1292,46 +1292,16 @@ Additional Notes: ${formData.additionalNotes}
                   </h3>
                   <ImageUpload
                     onImageUpload={handleImageUploaded}
+                    onRemoveImage={handleRemoveImage}
+                    existingImages={formData.images}
                     maxImages={10}
                     path="job-images"
                     bucket="app-images"
-                    existingImages={formData.images}
-                    onRemoveImage={handleRemoveImage}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     Upload up to 10 images (max 5MB each). Images will be
                     automatically compressed before upload.
                   </p>
-
-                  {formData.images.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium mb-2">
-                        Uploaded Images:
-                      </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {formData.images.map((image, index) => (
-                          <div
-                            key={`${image}-${index}`}
-                            className="relative rounded-md overflow-hidden border h-24"
-                          >
-                            <img
-                              src={image}
-                              alt={`Uploaded image ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(image)}
-                              className="absolute top-1 right-1 bg-black/70 hover:bg-black p-1 rounded-full"
-                              aria-label="Remove image"
-                            >
-                              <X className="h-3 w-3 text-white" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
                 {!isLastSection() && activeAccordion === "attachments" && (
                   <div className="mt-6">

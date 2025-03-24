@@ -86,6 +86,7 @@ export function useCookiePreferences() {
   // Load cookie preferences on mount and when user changes
   useEffect(() => {
     let isMounted = true;
+    let abortController = new AbortController();
 
     const loadPreferences = async () => {
       try {
@@ -97,18 +98,21 @@ export function useCookiePreferences() {
           setIsLoading(false);
 
           // If user is logged in, sync cookie preferences to database
-          if (user) {
+          if (user && isMounted) {
             try {
               await fetch("/api/user/cookie-preferences", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ cookiePreferences: storedPreferences }),
+                signal: abortController.signal,
               });
             } catch (error) {
-              console.error(
-                "Error syncing cookie preferences to database:",
-                error
-              );
+              if (!abortController.signal.aborted) {
+                console.error(
+                  "Error syncing cookie preferences to database:",
+                  error
+                );
+              }
             }
           }
           return;
@@ -120,33 +124,39 @@ export function useCookiePreferences() {
             const response = await fetch("/api/user/cookie-preferences", {
               method: "GET",
               headers: { "Content-Type": "application/json" },
+              signal: abortController.signal,
             });
 
-            if (response.ok) {
+            if (response.ok && isMounted) {
               const data = await response.json();
               const dbPreferences =
                 data.cookiePreferences || defaultPreferences;
-              if (isMounted) {
-                setPreferences(dbPreferences);
-                setHasConsented(true);
-                // Sync database preferences to cookies
-                setCookiePreferences(dbPreferences);
-              }
+
+              setPreferences(dbPreferences);
+              setHasConsented(true);
+              // Sync database preferences to cookies
+              setCookiePreferences(dbPreferences);
             }
           } catch (error) {
-            console.error(
-              "Error loading cookie preferences from database:",
-              error
-            );
+            if (!abortController.signal.aborted) {
+              console.error(
+                "Error loading cookie preferences from database:",
+                error
+              );
+            }
           }
+        } else {
+          // For non-logged in users, set default preferences if no stored preferences found
+          setPreferences(defaultPreferences);
+          setHasConsented(false); // Ensure consent is required for new users
         }
 
         if (isMounted) {
           setIsLoading(false);
         }
       } catch (error) {
-        console.error("Error in loadPreferences:", error);
         if (isMounted) {
+          console.error("Error in loadPreferences:", error);
           setIsLoading(false);
         }
       }
@@ -156,12 +166,15 @@ export function useCookiePreferences() {
 
     return () => {
       isMounted = false;
+      abortController.abort();
     };
   }, [user]);
 
   const updateCookiePreferences = async (
     newPreferences: Partial<CookiePreferences>
   ) => {
+    const abortController = new AbortController();
+
     try {
       const updatedPreferences = {
         ...cookiePreferences,
@@ -185,6 +198,7 @@ export function useCookiePreferences() {
           body: JSON.stringify({
             cookiePreferences: updatedPreferences,
           }),
+          signal: abortController.signal,
         });
 
         if (response.ok) {
@@ -200,8 +214,10 @@ export function useCookiePreferences() {
         return true;
       }
     } catch (error) {
-      console.error("Error updating cookie preferences:", error);
-      toast.error("Failed to update cookie preferences");
+      if (!abortController.signal.aborted) {
+        console.error("Error updating cookie preferences:", error);
+        toast.error("Failed to update cookie preferences");
+      }
       return false;
     }
   };

@@ -86,7 +86,10 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       console.log(`User not found for email: ${email}`);
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Invalid email address" },
+        { status: 404 }
+      );
     }
 
     if (user.emailVerified) {

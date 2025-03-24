@@ -262,14 +262,7 @@ export async function DELETE(
 
     // Use a transaction to delete the job and all related records
     await prisma.$transaction(async (tx) => {
-      // 1. First delete any messages associated with the job
-      await tx.message.deleteMany({
-        where: {
-          jobId: params.id,
-        },
-      });
-
-      // 2. Finally delete the job itself
+      // Delete the job itself
       await tx.job.delete({
         where: {
           id: params.id,

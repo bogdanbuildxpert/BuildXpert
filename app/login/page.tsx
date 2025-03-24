@@ -126,12 +126,14 @@ function LoginPageContent() {
           const redirectWithFlag = redirectUrl.includes("?")
             ? `${redirectUrl}&just_authenticated=true`
             : `${redirectUrl}?just_authenticated=true`;
+
+          console.log("Redirecting to:", redirectWithFlag);
           router.push(redirectWithFlag);
         } else {
           // For external URLs, use window.location
           window.location.href = redirectUrl;
         }
-      }, 100);
+      }, 300); // Increased delay for better reliability
     } catch (error) {
       console.error("Login error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to login");

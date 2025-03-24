@@ -149,14 +149,12 @@ export async function middleware(request: NextRequest) {
 
   // If it's an auth-protected route and the user is not authenticated, redirect to login
   if (isAuthProtectedRoute && !isAuthenticated) {
-    // Check if we just came from login by looking for a 'from' parameter
-    // This can happen when the auth cookies aren't fully synchronized yet
+    // Check if we just came from login by looking for a just_authenticated parameter
     const justAuthenticated =
       request.nextUrl.searchParams.has("just_authenticated");
 
+    // If just authenticated, let the request go through and handle auth client-side
     if (justAuthenticated) {
-      // If we just authenticated, let the request go through without redirection
-      // The client-side auth check will handle any remaining issues
       console.log(`Allowing access to ${path} after recent authentication`);
       return NextResponse.next();
     }
@@ -167,13 +165,7 @@ export async function middleware(request: NextRequest) {
     redirectUrl.searchParams.set("from", path);
 
     console.log(
-      `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}, auth status: ${JSON.stringify(
-        {
-          hasToken: !!token,
-          hasCookie: !!cookieUser,
-          timestamp: new Date().toISOString(),
-        }
-      )}`
+      `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}`
     );
     return NextResponse.redirect(redirectUrl);
   }

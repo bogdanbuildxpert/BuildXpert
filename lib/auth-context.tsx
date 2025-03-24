@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Force a client-side refresh to ensure session state is synchronized
-  const forceRefresh = () => {
+  const forceRefresh = useCallback(() => {
     console.log("Forcing auth state refresh");
 
     // Check if we have a user in localStorage
@@ -244,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       }
     }
-  };
+  }, [user]);
 
   return (
     <AuthContext.Provider

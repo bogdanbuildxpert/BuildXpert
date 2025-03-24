@@ -72,14 +72,11 @@ export default function PostJobPage() {
   const { user, isLoading: authLoading, forceRefresh } = useAuth();
   const { data: session, status: sessionStatus } = useSession();
   const csrfTokenRef = useRef<string | null>(null);
-  const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [activeAccordion, setActiveAccordion] = useState<string>("client-info");
-  const [currentSection, setCurrentSection] = useState(1);
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
@@ -121,29 +118,26 @@ export default function PostJobPage() {
     images: [] as string[],
   });
 
-  // Add this useEffect to force an authentication refresh when the page loads
+  // Add a simplified useEffect to force a refresh of auth state
   useEffect(() => {
-    console.log("Post-job page loaded, forcing auth refresh");
-    // Force refresh auth state to ensure tokens are properly synchronized
-    forceRefresh();
+    // Check if the user is authenticated, and if not, redirect to login
+    if (forceRefresh && typeof forceRefresh === "function") {
+      forceRefresh();
+    }
 
-    // If not authenticated after the refresh, redirect to login
+    // If we're not in loading state and there's no user, redirect to login
     if (!authLoading && !user) {
-      console.log("No user found after auth refresh, redirecting to login");
       router.push("/login?redirect=/post-job");
     }
-  }, [forceRefresh, user, authLoading, router]);
+  }, [authLoading, user, router, forceRefresh]);
 
-  // Update CSRF token on component mount
+  // Update CSRF token on component mount - simplified
   useEffect(() => {
     const updateCsrfToken = async () => {
-      if (!isMountedRef.current) return;
-
       try {
         const token = await getCsrfToken();
-        if (token && isMountedRef.current) {
+        if (token) {
           csrfTokenRef.current = token;
-          setCsrfToken(token);
         }
       } catch (error) {
         console.error("Error fetching CSRF token:", error);
@@ -333,9 +327,6 @@ export default function PostJobPage() {
   const handleImageUploaded = (imageUrl: string) => {
     if (!isMountedRef.current) return;
 
-    setImages((prev) => [...prev, imageUrl]);
-
-    // Update form data with new image URL
     setFormData((prev) => ({
       ...prev,
       images: [...prev.images, imageUrl],

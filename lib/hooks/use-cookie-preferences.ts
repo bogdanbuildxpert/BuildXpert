@@ -26,27 +26,54 @@ const getCookiePreferences = (): CookiePreferences | null => {
       .find((row) => row.startsWith(`${COOKIE_CONSENT_KEY}=`));
 
     if (storedPreferences) {
-      const preferences = JSON.parse(
-        storedPreferences.split("=")[1]
-      ) as CookiePreferences;
-      // Ensure essential cookies are always true
-      preferences.essential = true;
-      // Ensure hasConsented is included
-      preferences.hasConsented = true;
-      return preferences;
+      try {
+        const cookieValue = decodeURIComponent(storedPreferences.split("=")[1]);
+        // Validate that the cookie value starts with { and ends with }
+        if (!cookieValue.startsWith("{") || !cookieValue.endsWith("}")) {
+          console.warn(
+            "Invalid cookie format, resetting to default preferences"
+          );
+          return defaultPreferences;
+        }
+        const preferences = JSON.parse(cookieValue) as CookiePreferences;
+        // Validate the structure of the preferences
+        if (typeof preferences !== "object" || preferences === null) {
+          console.warn("Invalid preferences structure, resetting to default");
+          return defaultPreferences;
+        }
+        // Ensure essential cookies are always true
+        preferences.essential = true;
+        // Ensure hasConsented is included
+        preferences.hasConsented = true;
+        return preferences;
+      } catch (parseError) {
+        console.error("Error parsing cookie value:", parseError);
+        return defaultPreferences;
+      }
     }
   } catch (error) {
-    console.error("Error parsing cookie preferences:", error);
+    console.error("Error reading cookie preferences:", error);
   }
   return null;
 };
 
 // Helper function to set cookie preferences in browser cookies
 const setCookiePreferences = (preferences: CookiePreferences) => {
-  const cookieValue = JSON.stringify(preferences);
-  document.cookie = `${COOKIE_CONSENT_KEY}=${cookieValue}; path=/; max-age=${
-    60 * 60 * 24 * 365 // 1 year
-  }; ${process.env.NODE_ENV === "production" ? "secure; " : ""}samesite=lax`;
+  try {
+    // Ensure essential cookies are always true
+    preferences.essential = true;
+    // Ensure hasConsented is included
+    preferences.hasConsented = true;
+
+    // Properly encode the cookie value
+    const cookieValue = encodeURIComponent(JSON.stringify(preferences));
+
+    document.cookie = `${COOKIE_CONSENT_KEY}=${cookieValue}; path=/; max-age=${
+      60 * 60 * 24 * 365 // 1 year
+    }; ${process.env.NODE_ENV === "production" ? "secure; " : ""}samesite=lax`;
+  } catch (error) {
+    console.error("Error setting cookie preferences:", error);
+  }
 };
 
 export function useCookiePreferences() {

@@ -24,6 +24,7 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   emailVerified    DateTime?
+  cookiePreferences Json?    @default("{\"essential\":true,\"analytics\":true,\"preferences\":true}")
   postedJobs       Job[]     @relation("JobPoster")
   projects         Project[]
   reviews          Review[]  @relation("ReviewAuthor")

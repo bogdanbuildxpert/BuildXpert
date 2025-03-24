@@ -16,6 +16,12 @@ const InactivityMonitor = dynamic(
   { ssr: false }
 );
 
+// Dynamically import the CookieConsent with no SSR
+const CookieConsent = dynamic(
+  () => import("@/components/CookieConsent").then((mod) => mod.CookieConsent),
+  { ssr: false }
+);
+
 const inter = Inter({ subsets: ["latin"] });
 
 // Update the metadata title and description
@@ -104,7 +110,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/favicon.png" type="image/png" />
@@ -161,6 +167,7 @@ export default function RootLayout({
               <Footer />
             </div>
             <InactivityMonitor />
+            <CookieConsent />
           </AuthProvider>
         </Providers>
       </body>

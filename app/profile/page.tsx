@@ -29,6 +29,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { signOut } from "next-auth/react";
+import { useCookiePreferences } from "@/lib/hooks/use-cookie-preferences";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ProfilePage() {
   const { user, isLoading, login, logout } = useAuth();
@@ -51,6 +53,8 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isGoogleAccount, setIsGoogleAccount] = useState(false);
+  const { cookiePreferences, updateCookiePreferences } = useCookiePreferences();
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -263,6 +267,12 @@ export default function ProfilePage() {
       setIsDeletingAccount(false);
       setShowDeleteDialog(false);
     }
+  };
+
+  const handleSaveCookiePreferences = async () => {
+    setIsSavingPreferences(true);
+    await updateCookiePreferences(cookiePreferences);
+    setIsSavingPreferences(false);
   };
 
   if (isLoading || !user) {
@@ -526,6 +536,68 @@ export default function ProfilePage() {
 
           {/* Preferences Tab */}
           <TabsContent value="preferences" className="space-y-6">
+            {/* Cookie Preferences Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Cookie Preferences</CardTitle>
+                <CardDescription>
+                  Manage how we use cookies to enhance your experience
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="essential" checked disabled />
+                  <div className="space-y-1">
+                    <Label htmlFor="essential">Essential Cookies</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Required for the website to function properly
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="analytics"
+                    checked={cookiePreferences.analytics}
+                    onCheckedChange={(checked) =>
+                      updateCookiePreferences({ analytics: checked as boolean })
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="analytics">Analytics Cookies</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Help us improve by tracking usage patterns
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="preferences"
+                    checked={cookiePreferences.preferences}
+                    onCheckedChange={(checked) =>
+                      updateCookiePreferences({
+                        preferences: checked as boolean,
+                      })
+                    }
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="preferences">Preference Cookies</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Remember your settings and preferences
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  onClick={handleSaveCookiePreferences}
+                  disabled={isSavingPreferences}
+                >
+                  {isSavingPreferences ? "Saving..." : "Save Preferences"}
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* Notification Preferences Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Notification Preferences</CardTitle>

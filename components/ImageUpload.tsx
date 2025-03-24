@@ -16,6 +16,8 @@ interface ImageUploadProps {
   bucket?: string;
   path?: string;
   className?: string;
+  existingImages?: string[];
+  onRemoveImage?: (imageUrl: string) => void;
 }
 
 export default function ImageUpload({
@@ -25,6 +27,8 @@ export default function ImageUpload({
   bucket = "app-images",
   path = "",
   className = "",
+  existingImages = [],
+  onRemoveImage,
 }: ImageUploadProps) {
   // Use refs to avoid rerenders during file uploads
   const uploadingRef = useRef(false);

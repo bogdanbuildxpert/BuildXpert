@@ -14,18 +14,21 @@ export function LogoutButton() {
     return null;
   }
 
-  const handleLogout = () => {
-    // Clear the user cookie
-    document.cookie = "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  const handleLogout = async () => {
+    try {
+      // Call the logout function from auth context
+      // The updated logout function will handle all cookie clearing
+      // and redirection, so we don't need to do it here
+      await logout();
 
-    // Call the logout function from auth context
-    logout();
+      // Show success message
+      toast.success("Logged out successfully");
 
-    // Show success message
-    toast.success("Logged out successfully");
-
-    // Redirect to home page
-    router.push("/");
+      // No need to redirect here as the logout function now handles it
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Error during logout. Please try again.");
+    }
   };
 
   return (

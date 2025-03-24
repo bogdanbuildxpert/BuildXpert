@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     let userId = null;
     let userName = null;
     let userEmail = null;
+    let authMethod = null;
 
     // First try to get the token from NextAuth
     const token = await getToken({
@@ -85,6 +86,11 @@ export async function POST(request: NextRequest) {
       userId = token.sub;
       userName = (token.name as string) || null;
       userEmail = (token.email as string) || null;
+      authMethod = "nextauth";
+      console.log("User authenticated via NextAuth token:", {
+        userId,
+        userEmail,
+      });
     }
 
     // If we couldn't get the user ID from the token, try the cookie
@@ -98,6 +104,11 @@ export async function POST(request: NextRequest) {
             userId = userData.id;
             userName = userData.name;
             userEmail = userData.email;
+            authMethod = "cookie";
+            console.log("User authenticated via cookie:", {
+              userId,
+              userEmail,
+            });
           }
         } catch (err) {
           console.error("Failed to parse user cookie:", err);
@@ -107,8 +118,13 @@ export async function POST(request: NextRequest) {
 
     // If we still couldn't get the user ID, fail the request
     if (!userId) {
+      console.error("Authentication failed - no valid token or cookie found");
       return NextResponse.json(
-        { error: "Unauthorized. Please log in to post a job." },
+        {
+          error: "Unauthorized. Please log in to post a job.",
+          details:
+            "Your session may have expired. Please try logging out and logging back in.",
+        },
         { status: 401, headers }
       );
     }

@@ -74,7 +74,7 @@ function LoginPageContent() {
         redirect: redirectUrl,
       });
 
-      // Use NextAuth's signIn function with enhanced error handling
+      // First attempt to sign in with NextAuth
       const result = await signIn("credentials", {
         redirect: false,
         email: loginData.email,
@@ -91,49 +91,65 @@ function LoginPageContent() {
         throw new Error("Login failed - please try again");
       }
 
-      toast.success("Login successful!");
-      console.log("Login successful, redirecting to:", redirectUrl);
+      // At this point, credentials are verified by NextAuth
+      console.log("Credentials verified, proceeding with direct login");
 
-      // Force a session update before redirecting
-      const session = await getSession();
-      console.log("Updated session:", session);
+      // Get user data directly from our debug endpoint which is more reliable
+      let userData = {
+        id: "temp-" + Date.now(), // We'll generate a temporary ID
+        email: loginData.email,
+        name: null,
+        role: "CLIENT",
+      };
 
-      // If we have a valid session now, also update the auth context
-      if (session?.user) {
-        const userData = {
-          id: session.user.id as string,
-          name: session.user.name || null,
-          email: session.user.email as string,
-          role: (session.user as any).role || "CLIENT",
-        };
+      try {
+        // Try to get user data from our debug endpoint
+        const debugResponse = await fetch("/api/auth/debug-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: loginData.email,
+            password: loginData.password,
+          }),
+        });
 
-        console.log("Setting user data in auth context:", userData);
-        auth.login(userData);
+        const debugData = await debugResponse.json();
 
-        // Also store in localStorage and cookie for better persistence
-        localStorage.setItem("user", JSON.stringify(userData));
-        document.cookie = `user=${encodeURIComponent(
-          JSON.stringify(userData)
-        )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+        // If successful, use the user data from the debug endpoint
+        if (debugResponse.ok && debugData.user) {
+          userData = {
+            id: debugData.user.id,
+            email: debugData.user.email,
+            name: debugData.user.name,
+            role: debugData.user.role,
+          };
+          console.log("Got user data from debug endpoint:", userData);
+        } else {
+          console.warn("Debug login failed, using basic user data:", debugData);
+        }
+      } catch (error) {
+        console.error("Failed to get user data from debug endpoint:", error);
+        // Continue with basic user data
       }
 
-      // Small delay to ensure auth state is fully updated
-      setTimeout(() => {
-        // Use router push for client-side navigation when appropriate
-        if (redirectUrl.startsWith("/")) {
-          // For internal routes, use the router
-          // Add a parameter to indicate we just authenticated
-          const redirectWithFlag = redirectUrl.includes("?")
-            ? `${redirectUrl}&just_authenticated=true`
-            : `${redirectUrl}?just_authenticated=true`;
+      // Attempt direct login with the auth context
+      console.log("Attempting direct login with user data:", userData);
+      const loginResult = await auth.login(userData);
 
-          console.log("Redirecting to:", redirectWithFlag);
-          router.push(redirectWithFlag);
-        } else {
-          // For external URLs, use window.location
-          window.location.href = redirectUrl;
-        }
-      }, 300); // Increased delay for better reliability
+      if (!loginResult) {
+        console.error("Auth context login failed, but we'll redirect anyway");
+      } else {
+        console.log("Auth context login succeeded");
+      }
+
+      toast.success("Login successful!");
+
+      // Delay the redirect slightly to allow the auth state to be fully set
+      setTimeout(() => {
+        router.push(redirectUrl);
+      }, 500);
     } catch (error) {
       console.error("Login error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to login");

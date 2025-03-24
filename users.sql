@@ -1,0 +1,1 @@
+SELECT id, email, name, role, "emailVerified" FROM "User" LIMIT 10; 

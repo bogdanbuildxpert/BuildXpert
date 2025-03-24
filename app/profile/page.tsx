@@ -31,6 +31,7 @@ import {
 import { signOut } from "next-auth/react";
 import { useCookiePreferences } from "@/lib/hooks/use-cookie-preferences";
 import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const { user, isLoading, login, logout } = useAuth();
@@ -112,13 +113,14 @@ export default function ProfilePage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/user/profile", {
+      const response = await fetch("/api/user/profile-fix", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: profileData.name,
+          email: user.email, // Add email for lookup
         }),
       });
 
@@ -338,7 +340,21 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="p-2 border rounded-md bg-muted/50">
-                      {user.name || "Not set"}
+                      {user.name || (
+                        <span className="text-muted-foreground italic flex items-center justify-between">
+                          <span>
+                            Not set - click Edit Profile to add your name
+                          </span>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            asChild
+                            className="ml-2"
+                          >
+                            <Link href="/set-name">Set name directly</Link>
+                          </Button>
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

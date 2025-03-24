@@ -89,7 +89,7 @@ export function Navigation() {
                         className="flex items-center gap-2"
                       >
                         <User size={16} />
-                        {user.name || user.email}
+                        {user.name ? user.name : user.email}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

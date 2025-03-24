@@ -33,13 +33,13 @@ const getCookiePreferences = (): CookiePreferences | null => {
           console.warn(
             "Invalid cookie format, resetting to default preferences"
           );
-          return defaultPreferences;
+          return null;
         }
         const preferences = JSON.parse(cookieValue) as CookiePreferences;
         // Validate the structure of the preferences
         if (typeof preferences !== "object" || preferences === null) {
           console.warn("Invalid preferences structure, resetting to default");
-          return defaultPreferences;
+          return null;
         }
         // Ensure essential cookies are always true
         preferences.essential = true;
@@ -48,7 +48,7 @@ const getCookiePreferences = (): CookiePreferences | null => {
         return preferences;
       } catch (parseError) {
         console.error("Error parsing cookie value:", parseError);
-        return defaultPreferences;
+        return null;
       }
     }
   } catch (error) {
@@ -62,15 +62,24 @@ const setCookiePreferences = (preferences: CookiePreferences) => {
   try {
     // Ensure essential cookies are always true
     preferences.essential = true;
-    // Ensure hasConsented is included
+    // Ensure hasConsented is included and set to true when explicitly saving preferences
     preferences.hasConsented = true;
 
     // Properly encode the cookie value
     const cookieValue = encodeURIComponent(JSON.stringify(preferences));
 
-    document.cookie = `${COOKIE_CONSENT_KEY}=${cookieValue}; path=/; max-age=${
-      60 * 60 * 24 * 365 // 1 year
-    }; ${process.env.NODE_ENV === "production" ? "secure; " : ""}samesite=lax`;
+    // Set cookie with proper flags
+    const cookieString = [
+      `${COOKIE_CONSENT_KEY}=${cookieValue}`,
+      "path=/",
+      `max-age=${60 * 60 * 24 * 365}`, // 1 year
+      "samesite=lax",
+      process.env.NODE_ENV === "production" ? "secure" : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
+
+    document.cookie = cookieString;
   } catch (error) {
     console.error("Error setting cookie preferences:", error);
   }
@@ -78,10 +87,19 @@ const setCookiePreferences = (preferences: CookiePreferences) => {
 
 export function useCookiePreferences() {
   const { user } = useAuth();
-  const [cookiePreferences, setPreferences] =
-    useState<CookiePreferences>(defaultPreferences);
+  const [cookiePreferences, setPreferences] = useState<CookiePreferences>(
+    () => {
+      // Try to get stored preferences on initial mount
+      const stored = getCookiePreferences();
+      return stored || defaultPreferences;
+    }
+  );
   const [isLoading, setIsLoading] = useState(true);
-  const [hasConsented, setHasConsented] = useState(false);
+  const [hasConsented, setHasConsented] = useState(() => {
+    // Initialize hasConsented based on stored preferences
+    const stored = getCookiePreferences();
+    return stored?.hasConsented || false;
+  });
 
   // Load cookie preferences on mount and when user changes
   useEffect(() => {
@@ -94,7 +112,7 @@ export function useCookiePreferences() {
         const storedPreferences = getCookiePreferences();
         if (storedPreferences && isMounted) {
           setPreferences(storedPreferences);
-          setHasConsented(!!storedPreferences.hasConsented);
+          setHasConsented(true); // If we have stored preferences, user has consented
           setIsLoading(false);
 
           // If user is logged in, sync cookie preferences to database
@@ -131,6 +149,7 @@ export function useCookiePreferences() {
               const data = await response.json();
               const dbPreferences =
                 data.cookiePreferences || defaultPreferences;
+              dbPreferences.hasConsented = true; // Ensure consent is set for DB preferences
 
               setPreferences(dbPreferences);
               setHasConsented(true);
@@ -145,10 +164,6 @@ export function useCookiePreferences() {
               );
             }
           }
-        } else {
-          // For non-logged in users, set default preferences if no stored preferences found
-          setPreferences(defaultPreferences);
-          setHasConsented(false); // Ensure consent is required for new users
         }
 
         if (isMounted) {

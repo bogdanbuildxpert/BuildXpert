@@ -117,7 +117,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/api/auth/") ||
     path === "/forgot-password" ||
     path === "/reset-password" ||
-    path === "/verify-email"
+    path === "/verify-email" ||
+    path === "/debug-login"
   ) {
     return response;
   }

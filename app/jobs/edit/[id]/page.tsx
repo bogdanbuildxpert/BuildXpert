@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,15 @@ export default function JobEditPage({ params }: JobEditPageProps) {
   const [completedSections, setCompletedSections] = useState<Set<string>>(
     new Set()
   );
+  const isMountedRef = useRef(true);
+
+  // Track component mount status
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Map fields to their accordion sections
   const fieldToAccordionMap: Record<string, string> = {
@@ -350,12 +359,25 @@ export default function JobEditPage({ params }: JobEditPageProps) {
 
   // Function to handle image upload from the ImageUpload component
   const handleImageUploaded = (imageUrl: string) => {
-    // Update form data with new image URL
+    if (!isMountedRef.current) return;
+
+    console.log("Image uploaded:", imageUrl);
     setFormData((prev) => ({
       ...prev,
       metadata: {
         ...(prev.metadata || {}),
         images: [...(prev.metadata?.images || []), imageUrl],
+      },
+    }));
+  };
+
+  // Function to remove an image from the uploaded images
+  const handleRemoveImage = (imageUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      metadata: {
+        ...(prev.metadata || {}),
+        images: (prev.metadata?.images || []).filter((url) => url !== imageUrl),
       },
     }));
   };
@@ -1309,15 +1331,11 @@ Additional Notes: ${formData.additionalNotes}
                   </h3>
                   <ImageUpload
                     onImageUpload={handleImageUploaded}
+                    onRemoveImage={handleRemoveImage}
+                    existingImages={formData.metadata?.images || []}
                     maxImages={10}
                     path="job-images"
                     bucket="app-images"
-                    initialImage={
-                      formData.metadata.images &&
-                      formData.metadata.images.length > 0
-                        ? formData.metadata.images[0]
-                        : undefined
-                    }
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     Upload up to 10 images (max 5MB each). Images will be

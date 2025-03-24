@@ -3,23 +3,29 @@ import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { Prisma, User } from "@prisma/client";
 
 const COOKIE_CONSENT_KEY = "cookie-consent";
 
+interface CookiePreferences {
+  essential: boolean;
+  analytics: boolean;
+  preferences: boolean;
+}
+
+const defaultPreferences: CookiePreferences = {
+  essential: true,
+  analytics: true,
+  preferences: true,
+};
+
 export async function PUT(req: Request) {
   try {
-    // Get the current session
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "You must be logged in to update cookie preferences" },
-        { status: 401 }
-      );
-    }
-
     // Get the request body
     const body = await req.json();
-    const { cookiePreferences } = body;
+    const { cookiePreferences } = body as {
+      cookiePreferences: CookiePreferences;
+    };
 
     if (!cookiePreferences) {
       return NextResponse.json(
@@ -31,13 +37,22 @@ export async function PUT(req: Request) {
     // Ensure essential cookies are always true
     cookiePreferences.essential = true;
 
-    // Update the user's cookie preferences in the database
-    await prisma.user.update({
-      where: { email: session.user.email },
-      data: { cookiePreferences },
-    });
+    // Get the current session
+    const session = await getServerSession(authOptions);
 
-    // Set the cookie
+    // If user is logged in, update their preferences in the database
+    if (session?.user?.email) {
+      const updateData: Prisma.UserUpdateInput = {
+        cookiePreferences: cookiePreferences as unknown as Prisma.JsonValue,
+      };
+
+      await prisma.user.update({
+        where: { email: session.user.email },
+        data: updateData,
+      });
+    }
+
+    // Set the cookie for all users
     cookies().set(COOKIE_CONSENT_KEY, JSON.stringify(cookiePreferences), {
       path: "/",
       maxAge: 60 * 60 * 24 * 365, // 1 year
@@ -62,25 +77,51 @@ export async function GET(req: Request) {
   try {
     // Get the current session
     const session = await getServerSession(authOptions);
+
+    // If user is not logged in, get preferences from cookies
     if (!session?.user?.email) {
+      const cookieStore = cookies();
+      const storedPreferences = cookieStore.get(COOKIE_CONSENT_KEY);
+
+      if (storedPreferences) {
+        try {
+          const preferences = JSON.parse(
+            storedPreferences.value
+          ) as CookiePreferences;
+          return NextResponse.json(
+            { cookiePreferences: preferences },
+            { status: 200 }
+          );
+        } catch (error) {
+          console.error("Error parsing cookie preferences:", error);
+        }
+      }
+
+      // Return default preferences if no cookie found
       return NextResponse.json(
-        { error: "You must be logged in to get cookie preferences" },
-        { status: 401 }
+        { cookiePreferences: defaultPreferences },
+        { status: 200 }
       );
     }
 
-    // Get the user's cookie preferences from the database
+    // For logged-in users, get preferences from database
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { cookiePreferences: true },
+      select: {
+        cookiePreferences: true,
+      } as const,
     });
 
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!user?.cookiePreferences) {
+      return NextResponse.json(
+        { cookiePreferences: defaultPreferences },
+        { status: 200 }
+      );
     }
 
+    const preferences = user.cookiePreferences as unknown as CookiePreferences;
     return NextResponse.json(
-      { cookiePreferences: user.cookiePreferences },
+      { cookiePreferences: preferences },
       { status: 200 }
     );
   } catch (error) {

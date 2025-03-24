@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
 export function CookieConsent() {
-  const [isOpen, setIsOpen] = useState(true);
-  const { cookiePreferences, updateCookiePreferences } = useCookiePreferences();
+  const { cookiePreferences, updateCookiePreferences, hasConsented } =
+    useCookiePreferences();
+  const [isOpen, setIsOpen] = useState(!hasConsented);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleAcceptAll = async () => {
@@ -48,13 +50,22 @@ export function CookieConsent() {
           <CardTitle>Cookie Preferences</CardTitle>
           <CardDescription>
             We use cookies to enhance your browsing experience and analyze our
-            traffic.
+            traffic. Please review our{" "}
+            <Link href="/privacy" className="underline hover:text-primary">
+              privacy policy
+            </Link>{" "}
+            for more information.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-2">
             <Checkbox id="essential" checked disabled />
-            <Label htmlFor="essential">Essential Cookies</Label>
+            <div className="space-y-1">
+              <Label htmlFor="essential">Essential Cookies</Label>
+              <p className="text-sm text-muted-foreground">
+                Required for the website to function properly
+              </p>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -64,7 +75,12 @@ export function CookieConsent() {
                 updateCookiePreferences({ analytics: checked as boolean })
               }
             />
-            <Label htmlFor="analytics">Analytics Cookies</Label>
+            <div className="space-y-1">
+              <Label htmlFor="analytics">Analytics Cookies</Label>
+              <p className="text-sm text-muted-foreground">
+                Help us improve by tracking usage patterns
+              </p>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
@@ -74,7 +90,12 @@ export function CookieConsent() {
                 updateCookiePreferences({ preferences: checked as boolean })
               }
             />
-            <Label htmlFor="preferences">Preference Cookies</Label>
+            <div className="space-y-1">
+              <Label htmlFor="preferences">Preference Cookies</Label>
+              <p className="text-sm text-muted-foreground">
+                Remember your settings and preferences
+              </p>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">

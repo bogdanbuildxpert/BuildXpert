@@ -24,6 +24,7 @@ interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   resetInactivityTimer: () => void;
+  forceRefresh: () => void;
 }
 
 // 5 hours in milliseconds
@@ -217,9 +218,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetInactivityTimer();
   };
 
+  // Force a client-side refresh to ensure session state is synchronized
+  const forceRefresh = () => {
+    console.log("Forcing auth state refresh");
+
+    // Check if we have a user in localStorage
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        // Re-set the user cookie to ensure it's properly set
+        const cookieValue = `user=${encodeURIComponent(
+          storedUser
+        )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+        document.cookie = cookieValue;
+
+        // Update state if needed
+        if (!user || user.id !== userData.id) {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to parse user from localStorage during refresh:",
+          error
+        );
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, logout, resetInactivityTimer }}
+      value={{
+        user,
+        isLoading,
+        login,
+        logout,
+        resetInactivityTimer,
+        forceRefresh,
+      }}
     >
       {children}
     </AuthContext.Provider>

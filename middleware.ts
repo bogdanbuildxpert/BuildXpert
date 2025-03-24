@@ -44,12 +44,15 @@ export async function middleware(request: NextRequest) {
         id: cookieUser.id,
         role: cookieUser.role,
         email: cookieUser.email,
+        timestamp: new Date().toISOString(),
       });
     } catch (e) {
       console.error(`Failed to parse user cookie for ${path}:`, e);
     }
   } else {
-    console.log(`No user cookie found for ${path}`);
+    console.log(
+      `No user cookie found for ${path}, timestamp: ${new Date().toISOString()}`
+    );
   }
 
   // Get the NextAuth session token
@@ -146,13 +149,31 @@ export async function middleware(request: NextRequest) {
 
   // If it's an auth-protected route and the user is not authenticated, redirect to login
   if (isAuthProtectedRoute && !isAuthenticated) {
+    // Check if we just came from login by looking for a 'from' parameter
+    // This can happen when the auth cookies aren't fully synchronized yet
+    const justAuthenticated =
+      request.nextUrl.searchParams.has("just_authenticated");
+
+    if (justAuthenticated) {
+      // If we just authenticated, let the request go through without redirection
+      // The client-side auth check will handle any remaining issues
+      console.log(`Allowing access to ${path} after recent authentication`);
+      return NextResponse.next();
+    }
+
     // Create the URL to redirect to
     const redirectUrl = new URL("/login", request.url);
     // Add the original URL as a parameter so we can redirect back after login
     redirectUrl.searchParams.set("from", path);
 
     console.log(
-      `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}`
+      `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}, auth status: ${JSON.stringify(
+        {
+          hasToken: !!token,
+          hasCookie: !!cookieUser,
+          timestamp: new Date().toISOString(),
+        }
+      )}`
     );
     return NextResponse.redirect(redirectUrl);
   }

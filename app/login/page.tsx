@@ -122,7 +122,11 @@ function LoginPageContent() {
         // Use router push for client-side navigation when appropriate
         if (redirectUrl.startsWith("/")) {
           // For internal routes, use the router
-          router.push(redirectUrl);
+          // Add a parameter to indicate we just authenticated
+          const redirectWithFlag = redirectUrl.includes("?")
+            ? `${redirectUrl}&just_authenticated=true`
+            : `${redirectUrl}?just_authenticated=true`;
+          router.push(redirectWithFlag);
         } else {
           // For external URLs, use window.location
           window.location.href = redirectUrl;

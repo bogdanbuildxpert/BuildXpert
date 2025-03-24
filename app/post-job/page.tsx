@@ -69,12 +69,11 @@ interface Job {
 
 export default function PostJobPage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-  const {
-    data: session,
-    status: sessionStatus,
-    update: updateSession,
-  } = useSession();
+  const { user, isLoading: authLoading, forceRefresh } = useAuth();
+  const { data: session, status: sessionStatus } = useSession();
+  const csrfTokenRef = useRef<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
   const [isLoading, setIsLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -87,8 +86,6 @@ export default function PostJobPage() {
 
   // Add a ref to track form submission attempts
   const submissionAttemptRef = useRef(0);
-  // Add a ref to track if component is mounted
-  const isMountedRef = useRef(true);
 
   const [completedSections, setCompletedSections] = useState<Set<string>>(
     new Set()
@@ -124,6 +121,38 @@ export default function PostJobPage() {
     images: [] as string[],
   });
 
+  // Add this useEffect to force an authentication refresh when the page loads
+  useEffect(() => {
+    console.log("Post-job page loaded, forcing auth refresh");
+    // Force refresh auth state to ensure tokens are properly synchronized
+    forceRefresh();
+
+    // If not authenticated after the refresh, redirect to login
+    if (!authLoading && !user) {
+      console.log("No user found after auth refresh, redirecting to login");
+      router.push("/login?redirect=/post-job");
+    }
+  }, [forceRefresh, user, authLoading, router]);
+
+  // Update CSRF token on component mount
+  useEffect(() => {
+    const updateCsrfToken = async () => {
+      if (!isMountedRef.current) return;
+
+      try {
+        const token = await getCsrfToken();
+        if (token && isMountedRef.current) {
+          csrfTokenRef.current = token;
+          setCsrfToken(token);
+        }
+      } catch (error) {
+        console.error("Error fetching CSRF token:", error);
+      }
+    };
+
+    updateCsrfToken();
+  }, []);
+
   // Track component mount/unmount
   useEffect(() => {
     isMountedRef.current = true;
@@ -154,7 +183,7 @@ export default function PostJobPage() {
               ...prev,
               email: user.email,
             }));
-          } else if (session?.user?.email) {
+          } else if (session.user?.email) {
             setFormData((prev) => ({
               ...prev,
               email: session.user.email as string,

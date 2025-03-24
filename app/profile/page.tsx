@@ -270,9 +270,15 @@ export default function ProfilePage() {
   };
 
   const handleSaveCookiePreferences = async () => {
-    setIsSavingPreferences(true);
-    await updateCookiePreferences(cookiePreferences);
-    setIsSavingPreferences(false);
+    try {
+      setIsSavingPreferences(true);
+      await updateCookiePreferences(cookiePreferences);
+    } catch (error) {
+      console.error("Error saving cookie preferences:", error);
+      toast.error("Failed to save cookie preferences");
+    } finally {
+      setIsSavingPreferences(false);
+    }
   };
 
   if (isLoading || !user) {
@@ -558,9 +564,12 @@ export default function ProfilePage() {
                   <Checkbox
                     id="analytics"
                     checked={cookiePreferences.analytics}
-                    onCheckedChange={(checked) =>
-                      updateCookiePreferences({ analytics: checked as boolean })
-                    }
+                    onCheckedChange={(checked) => {
+                      if (typeof checked === "boolean") {
+                        updateCookiePreferences({ analytics: checked });
+                      }
+                    }}
+                    disabled={isSavingPreferences}
                   />
                   <div className="space-y-1">
                     <Label htmlFor="analytics">Analytics Cookies</Label>
@@ -573,11 +582,12 @@ export default function ProfilePage() {
                   <Checkbox
                     id="preferences"
                     checked={cookiePreferences.preferences}
-                    onCheckedChange={(checked) =>
-                      updateCookiePreferences({
-                        preferences: checked as boolean,
-                      })
-                    }
+                    onCheckedChange={(checked) => {
+                      if (typeof checked === "boolean") {
+                        updateCookiePreferences({ preferences: checked });
+                      }
+                    }}
+                    disabled={isSavingPreferences}
                   />
                   <div className="space-y-1">
                     <Label htmlFor="preferences">Preference Cookies</Label>

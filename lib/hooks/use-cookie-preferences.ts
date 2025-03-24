@@ -6,6 +6,7 @@ interface CookiePreferences {
   essential: boolean;
   analytics: boolean;
   preferences: boolean;
+  hasConsented?: boolean;
 }
 
 const COOKIE_CONSENT_KEY = "cookie-consent";
@@ -14,6 +15,7 @@ const defaultPreferences: CookiePreferences = {
   essential: true,
   analytics: true,
   preferences: true,
+  hasConsented: false,
 };
 
 // Helper function to get cookie preferences from browser cookies
@@ -29,6 +31,8 @@ const getCookiePreferences = (): CookiePreferences | null => {
       ) as CookiePreferences;
       // Ensure essential cookies are always true
       preferences.essential = true;
+      // Ensure hasConsented is included
+      preferences.hasConsented = true;
       return preferences;
     }
   } catch (error) {
@@ -54,79 +58,98 @@ export function useCookiePreferences() {
 
   // Load cookie preferences on mount and when user changes
   useEffect(() => {
-    const loadPreferences = async () => {
-      // First check browser cookies
-      const storedPreferences = getCookiePreferences();
-      if (storedPreferences) {
-        setPreferences(storedPreferences);
-        setHasConsented(true);
-        setIsLoading(false);
+    let isMounted = true;
 
-        // If user is logged in, sync cookie preferences to database
-        if (user) {
+    const loadPreferences = async () => {
+      try {
+        // First check browser cookies
+        const storedPreferences = getCookiePreferences();
+        if (storedPreferences && isMounted) {
+          setPreferences(storedPreferences);
+          setHasConsented(!!storedPreferences.hasConsented);
+          setIsLoading(false);
+
+          // If user is logged in, sync cookie preferences to database
+          if (user) {
+            try {
+              await fetch("/api/user/cookie-preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cookiePreferences: storedPreferences }),
+              });
+            } catch (error) {
+              console.error(
+                "Error syncing cookie preferences to database:",
+                error
+              );
+            }
+          }
+          return;
+        }
+
+        // If no cookie preferences found and user is logged in, try to load from database
+        if (user && isMounted) {
           try {
-            await fetch("/api/user/cookie-preferences", {
-              method: "PUT",
+            const response = await fetch("/api/user/cookie-preferences", {
+              method: "GET",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cookiePreferences: storedPreferences }),
             });
+
+            if (response.ok) {
+              const data = await response.json();
+              const dbPreferences =
+                data.cookiePreferences || defaultPreferences;
+              if (isMounted) {
+                setPreferences(dbPreferences);
+                setHasConsented(true);
+                // Sync database preferences to cookies
+                setCookiePreferences(dbPreferences);
+              }
+            }
           } catch (error) {
             console.error(
-              "Error syncing cookie preferences to database:",
+              "Error loading cookie preferences from database:",
               error
             );
           }
         }
-        return;
-      }
 
-      // If no cookie preferences found and user is logged in, try to load from database
-      if (user) {
-        try {
-          const response = await fetch("/api/user/cookie-preferences", {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const dbPreferences = data.cookiePreferences || defaultPreferences;
-            setPreferences(dbPreferences);
-            setHasConsented(true);
-            // Sync database preferences to cookies
-            setCookiePreferences(dbPreferences);
-          }
-        } catch (error) {
-          console.error(
-            "Error loading cookie preferences from database:",
-            error
-          );
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Error in loadPreferences:", error);
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
-
-      setIsLoading(false);
     };
 
     loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const updateCookiePreferences = async (
     newPreferences: Partial<CookiePreferences>
   ) => {
-    const updatedPreferences = {
-      ...cookiePreferences,
-      ...newPreferences,
-      essential: true, // Essential cookies cannot be disabled
-    };
+    try {
+      const updatedPreferences = {
+        ...cookiePreferences,
+        ...newPreferences,
+        essential: true, // Essential cookies cannot be disabled
+        hasConsented: true, // Mark as consented when preferences are updated
+      };
 
-    // Always update browser cookies
-    setCookiePreferences(updatedPreferences);
-    setPreferences(updatedPreferences);
-    setHasConsented(true);
+      // Always update browser cookies
+      setCookiePreferences(updatedPreferences);
+      setPreferences(updatedPreferences);
+      setHasConsented(true);
 
-    // If user is logged in, also update database
-    if (user) {
-      try {
+      // If user is logged in, also update database
+      if (user) {
         const response = await fetch("/api/user/cookie-preferences", {
           method: "PUT",
           headers: {
@@ -145,15 +168,15 @@ export function useCookiePreferences() {
           toast.error(data.error || "Failed to update cookie preferences");
           return false;
         }
-      } catch (error) {
-        console.error("Error updating cookie preferences:", error);
-        toast.error("Failed to update cookie preferences");
-        return false;
+      } else {
+        toast.success("Cookie preferences updated successfully");
+        return true;
       }
+    } catch (error) {
+      console.error("Error updating cookie preferences:", error);
+      toast.error("Failed to update cookie preferences");
+      return false;
     }
-
-    toast.success("Cookie preferences updated successfully");
-    return true;
   };
 
   return {

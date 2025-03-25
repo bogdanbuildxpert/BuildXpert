@@ -696,7 +696,7 @@ Additional Notes: ${formData.additionalNotes}
                     <Button
                       type="button"
                       size="lg"
-                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                       onClick={handleNextSection}
                       aria-label="Continue to Job Details"
                     >
@@ -974,7 +974,7 @@ Additional Notes: ${formData.additionalNotes}
                     <Button
                       type="button"
                       size="lg"
-                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                       onClick={handleNextSection}
                       aria-label="Continue to Painting Preferences"
                     >
@@ -1094,7 +1094,7 @@ Additional Notes: ${formData.additionalNotes}
                       <Button
                         type="button"
                         size="lg"
-                        className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                        className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                         onClick={handleNextSection}
                         aria-label="Continue to Project Scope"
                       >
@@ -1241,7 +1241,7 @@ Additional Notes: ${formData.additionalNotes}
                     <Button
                       type="button"
                       size="lg"
-                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                       onClick={handleNextSection}
                       aria-label="Continue to Additional Requirements"
                     >
@@ -1301,7 +1301,7 @@ Additional Notes: ${formData.additionalNotes}
                       <Button
                         type="button"
                         size="lg"
-                        className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                        className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                         onClick={handleNextSection}
                         aria-label="Continue to Attachments"
                       >
@@ -1348,7 +1348,7 @@ Additional Notes: ${formData.additionalNotes}
                     <Button
                       type="button"
                       size="lg"
-                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                       onClick={handleNextSection}
                       aria-label="Continue to Additional Notes"
                     >
@@ -1396,7 +1396,7 @@ Additional Notes: ${formData.additionalNotes}
                     <Button
                       type="button"
                       size="lg"
-                      className="w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
+                      className="w-1/2 md:w-1/4 bg-primary hover:bg-primary/90 text-primary-foreground ml-auto"
                       onClick={handleNextSection}
                       aria-label="Continue to Basic Job Information"
                     >

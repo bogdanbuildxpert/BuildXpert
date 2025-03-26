@@ -1,0 +1,7 @@
+warning: in the working copy of 'logs/pm2-out.log', LF will be replaced by CRLF the next time Git touches it
+app/api/auth/login/route.ts
+app/api/auth/register/route.ts
+lib/auth.ts
+lib/email.ts
+logs/pm2-out.log
+middleware.ts

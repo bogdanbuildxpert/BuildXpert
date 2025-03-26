@@ -12,6 +12,7 @@
     "build:windows": "node scripts/debug-prisma-env.js && prisma generate && cross-env NODE_OPTIONS=\"--max-old-space-size=2048\" next build",
     "build:highmem": "node scripts/debug-prisma-env.js && prisma generate && cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" next build",
     "build:lowmem": "cross-env NODE_OPTIONS=\"--max-old-space-size=1024\" node scripts/debug-prisma-env.js && prisma generate && cross-env NODE_OPTIONS=\"--max-old-space-size=1024\" next build",
+    "build:2gb": "cross-env NODE_OPTIONS=\"--max-old-space-size=1536\" node scripts/debug-prisma-env.js && prisma generate && cross-env NODE_OPTIONS=\"--max-old-space-size=1536\" next build",
     "build:prod": "cross-env NODE_ENV=production NODE_OPTIONS=\"--max-old-space-size=1024\" next build",
     "vercel-build": "node scripts/setup-preview-env.js && node scripts/debug-prisma-env.js && node prisma/fix-prisma-vercel.js && prisma generate && next build",
     "postinstall": "prisma generate && node db/apply-triggers.js",

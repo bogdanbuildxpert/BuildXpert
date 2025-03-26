@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// Mark this route as dynamic since it uses request parameters and cookies
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   // Add cache control headers to prevent caching
   const headers = new Headers();

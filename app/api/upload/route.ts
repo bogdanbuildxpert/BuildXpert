@@ -8,13 +8,11 @@ import { authOptions } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // Increase body size limit for file uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "10mb",
-    },
-    responseLimit: "10mb",
-  },
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
+export const runtime = "nodejs";
+export const bodySize = {
+  sizeLimit: "10mb",
 };
 
 export async function POST(request: NextRequest) {

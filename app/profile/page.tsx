@@ -34,6 +34,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 
 export default function ProfilePage() {
+  // Check if we're in the browser environment
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const { user, isLoading, login, logout } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("account");
@@ -56,6 +63,20 @@ export default function ProfilePage() {
   const [isGoogleAccount, setIsGoogleAccount] = useState(false);
   const { cookiePreferences, updateCookiePreferences } = useCookiePreferences();
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+
+  // If not mounted yet (server-side), return a loading state or minimal content
+  if (!isMounted) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-pulse text-center">
+          <h1 className="text-2xl font-bold">Loading Profile...</h1>
+          <p className="text-muted-foreground mt-2">
+            Please wait while we load your profile information.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Redirect if not logged in
   useEffect(() => {
@@ -231,34 +252,36 @@ export default function ProfilePage() {
       if (response.ok) {
         toast.success("Account deleted successfully");
 
-        // Clear all cookies and local storage
-        localStorage.removeItem("user");
+        // Clear all cookies and local storage - safely check for browser environment
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("user");
 
-        // Clear cookies
-        document.cookie =
-          "user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie =
-          "next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie =
-          "next-auth.callback-url=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie =
-          "next-auth.csrf-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          // Clear cookies
+          const clearCookie = (name: string) => {
+            document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          };
 
-        // For Google accounts, ensure NextAuth signOut is called directly
-        if (isGoogleAccount) {
-          try {
-            // Sign out from NextAuth with a redirect to home page
-            await signOut({ redirect: false });
-          } catch (signOutError) {
-            console.error("Error during sign out:", signOutError);
+          clearCookie("user");
+          clearCookie("next-auth.session-token");
+          clearCookie("next-auth.callback-url");
+          clearCookie("next-auth.csrf-token");
+
+          // For Google accounts, ensure NextAuth signOut is called directly
+          if (isGoogleAccount) {
+            try {
+              // Sign out from NextAuth with a redirect to home page
+              await signOut({ callbackUrl: "/" });
+            } catch (signOutError) {
+              console.error("Error signing out with NextAuth:", signOutError);
+              // Still redirect even if sign out fails
+              window.location.href = "/";
+            }
+          } else {
+            // For regular accounts, call our logout function and redirect
+            logout();
+            window.location.href = "/";
           }
         }
-
-        // Use the logout function from auth context to properly clear user data
-        logout();
-
-        // Redirect to home page
-        router.push("/");
       } else {
         toast.error(data.error || "Failed to delete account");
       }

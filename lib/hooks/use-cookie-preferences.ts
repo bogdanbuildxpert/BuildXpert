@@ -18,8 +18,14 @@ const defaultPreferences: CookiePreferences = {
   hasConsented: false,
 };
 
+// Check if running in browser environment
+const isBrowser =
+  typeof window !== "undefined" && typeof document !== "undefined";
+
 // Helper function to get cookie preferences from browser cookies
 const getCookiePreferences = (): CookiePreferences | null => {
+  if (!isBrowser) return null;
+
   try {
     const storedPreferences = document.cookie
       .split("; ")
@@ -59,6 +65,8 @@ const getCookiePreferences = (): CookiePreferences | null => {
 
 // Helper function to set cookie preferences in browser cookies
 const setCookiePreferences = (preferences: CookiePreferences) => {
+  if (!isBrowser) return;
+
   try {
     // Ensure essential cookies are always true
     preferences.essential = true;
@@ -87,22 +95,27 @@ const setCookiePreferences = (preferences: CookiePreferences) => {
 
 export function useCookiePreferences() {
   const { user } = useAuth();
-  const [cookiePreferences, setPreferences] = useState<CookiePreferences>(
-    () => {
+  const [cookiePreferences, setPreferences] =
+    useState<CookiePreferences>(defaultPreferences);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasConsented, setHasConsented] = useState(false);
+
+  // Initialize preferences from cookies - only runs in browser
+  useEffect(() => {
+    if (isBrowser) {
       // Try to get stored preferences on initial mount
       const stored = getCookiePreferences();
-      return stored || defaultPreferences;
+      if (stored) {
+        setPreferences(stored);
+        setHasConsented(stored?.hasConsented || false);
+      }
     }
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasConsented, setHasConsented] = useState(() => {
-    // Initialize hasConsented based on stored preferences
-    const stored = getCookiePreferences();
-    return stored?.hasConsented || false;
-  });
+  }, []);
 
   // Load cookie preferences on mount and when user changes
   useEffect(() => {
+    if (!isBrowser) return;
+
     let isMounted = true;
     let abortController = new AbortController();
 
@@ -188,6 +201,8 @@ export function useCookiePreferences() {
   const updateCookiePreferences = async (
     newPreferences: Partial<CookiePreferences>
   ) => {
+    if (!isBrowser) return false;
+
     const abortController = new AbortController();
 
     try {

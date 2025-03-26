@@ -1,16 +1,22 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { signIn, getSession } from "next-auth/react";
 import { Separator } from "@/components/ui/separator";
 
 // Extract the inner content that uses useSearchParams
@@ -31,14 +37,17 @@ function LoginPageContent() {
     password: "",
     confirmPassword: "",
   });
+  const [status, setStatus] = useState("idle");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [error, setError] = useState("");
 
   // Get the redirect URL from the query parameters
-  const redirectUrl =
-    searchParams.get("redirect") || searchParams.get("from") || "/";
+  let redirectUrl = searchParams.get("callbackUrl") || "/dashboard";
 
-  // Get the tab parameter to determine which tab to show initially
-  const activeTab =
+  // Handle the tab state
+  const defaultTab =
     searchParams.get("tab") === "register" ? "register" : "login";
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   // Remove the redundant redirection code since middleware handles it now
   // Just keep a log message for debugging
@@ -50,6 +59,7 @@ function LoginPageContent() {
     }
   }, [auth.user]);
 
+  // Handle login form changes
   const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setLoginData((prev) => ({
@@ -58,6 +68,7 @@ function LoginPageContent() {
     }));
   };
 
+  // Handle register form changes
   const handleRegisterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     const field = id.replace("-register", "");
@@ -67,113 +78,51 @@ function LoginPageContent() {
     }));
   };
 
+  // Handle login form submission
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setStatus("submitting");
+    setStatusMessage("");
+    setError("");
 
     try {
-      console.log("Starting login process with credentials:", {
-        email: loginData.email,
-        passwordLength: loginData.password.length,
-        redirect: redirectUrl,
-      });
-
-      // First attempt to sign in with NextAuth
-      const result = await signIn("credentials", {
+      const response = await signIn("credentials", {
         redirect: false,
         email: loginData.email,
         password: loginData.password,
       });
 
-      console.log("Sign in result:", result);
-
-      if (result?.error) {
-        throw new Error(result.error || "Failed to login");
+      if (response?.error) {
+        setStatus("error");
+        setError(response.error);
+        return;
       }
 
-      if (!result?.ok) {
-        throw new Error("Login failed - please try again");
-      }
-
-      // At this point, credentials are verified by NextAuth
-      console.log("Credentials verified, proceeding with direct login");
-
-      // Get user data directly from our debug endpoint which is more reliable
-      let userData = {
-        id: "temp-" + Date.now(), // We'll generate a temporary ID
-        email: loginData.email,
-        name: null,
-        role: "CLIENT",
-      };
-
-      try {
-        // Try to get user data from our debug endpoint
-        const debugResponse = await fetch("/api/auth/debug-login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: loginData.email,
-            password: loginData.password,
-          }),
-        });
-
-        const debugData = await debugResponse.json();
-
-        // If successful, use the user data from the debug endpoint
-        if (debugResponse.ok && debugData.user) {
-          userData = {
-            id: debugData.user.id,
-            email: debugData.user.email,
-            name: debugData.user.name,
-            role: debugData.user.role,
-          };
-          console.log("Got user data from debug endpoint:", userData);
-        } else {
-          console.warn("Debug login failed, using basic user data:", debugData);
-        }
-      } catch (error) {
-        console.error("Failed to get user data from debug endpoint:", error);
-        // Continue with basic user data
-      }
-
-      // Attempt direct login with the auth context
-      console.log("Attempting direct login with user data:", userData);
-      const loginResult = await auth.login(userData);
-
-      if (!loginResult) {
-        console.error("Auth context login failed, but we'll redirect anyway");
-      } else {
-        console.log("Auth context login succeeded");
-      }
-
-      toast.success("Login successful!");
-
-      // Delay the redirect slightly to allow the auth state to be fully set
-      setTimeout(() => {
-        router.push(redirectUrl);
-      }, 500);
+      // Redirect on successful login
+      setStatus("success");
+      setStatusMessage("Login successful! Redirecting...");
+      router.push(redirectUrl);
     } catch (error) {
-      console.error("Login error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to login");
-    } finally {
-      setIsLoading(false);
+      setStatus("error");
+      setError("An unexpected error occurred. Please try again.");
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    // Validate passwords match
-    if (registerData.password !== registerData.confirmPassword) {
-      toast.error("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
+    setStatus("submitting");
+    setStatusMessage("");
+    setError("");
 
     try {
+      // Validate passwords match
+      if (registerData.password !== registerData.confirmPassword) {
+        setError("Passwords do not match");
+        setStatus("idle");
+        return;
+      }
+
+      // Submit registration
       let response;
       try {
         response = await fetch("/api/auth/register", {
@@ -185,50 +134,27 @@ function LoginPageContent() {
             name: `${registerData.firstName} ${registerData.lastName}`,
             email: registerData.email,
             password: registerData.password,
-            role: "CLIENT", // All new accounts are CLIENT by default
           }),
         });
       } catch (fetchError) {
-        console.error("Network error during registration fetch:", fetchError);
-        throw new Error(
-          "Network error. Please check your connection and try again."
-        );
+        console.error("Network error during registration:", fetchError);
+        throw new Error("Network error. Please check your connection.");
       }
 
-      // Check if the response is JSON before trying to parse it
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        // Handle non-JSON response
-        const text = await response.text();
-        console.error("Received non-JSON response:", text);
-        throw new Error(
-          "Server returned an invalid response. Please try again later."
-        );
-      }
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error("Error parsing JSON response:", jsonError);
-        throw new Error(
-          "Failed to process server response. Please try again later."
-        );
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to register");
       }
 
-      // Show success message with email verification instructions
-      toast.success(
-        "Registration successful! Please check your email to verify your account before logging in.",
-        {
-          duration: 6000, // Show for 6 seconds
-        }
+      // Handle successful registration
+      setStatusMessage(
+        data.message ||
+          "Registration successful. Please check your email to verify your account."
       );
+      setStatus("success");
 
-      // Reset the registration form
+      // Reset form
       setRegisterData({
         firstName: "",
         lastName: "",
@@ -237,18 +163,16 @@ function LoginPageContent() {
         confirmPassword: "",
       });
 
-      // Switch to the login tab
-      document.getElementById("login-tab")?.click();
-    } catch (error: unknown) {
-      console.error("Registration error:", error);
-
-      // Use type checking to safely access the message property
+      // Automatically switch to login tab after 3 seconds
+      setTimeout(() => {
+        const loginTab = document.querySelector('[value="login"]');
+        if (loginTab) (loginTab as HTMLElement).click();
+      }, 3000);
+    } catch (error) {
+      setStatus("error");
       const errorMessage =
         error instanceof Error ? error.message : "Failed to register";
-
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      setError(errorMessage);
     }
   };
 
@@ -277,180 +201,248 @@ function LoginPageContent() {
           </p>
         </div>
 
-        <Tabs defaultValue={activeTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger id="login-tab" value="login">
-              Login
-            </TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
-
-          {/* Login Tab */}
-          <TabsContent value="login" className="space-y-6">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={loginData.email}
-                  onChange={handleLoginChange}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={loginData.password}
-                  onChange={handleLoginChange}
-                  required
-                />
-              </div>
-              <Button className="w-full" type="submit" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator className="w-full" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
+        <Card className="mx-auto max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              {activeTab === "login" ? "Login" : "Create an Account"}
+            </CardTitle>
+            <CardDescription className="text-center">
+              {activeTab === "login"
+                ? "Enter your credentials to login to your account"
+                : "Enter your details to create a new account"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs
+              defaultValue={defaultTab}
+              value={activeTab}
+              onValueChange={setActiveTab}
               className="w-full"
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={googleLoading}
             >
-              {googleLoading ? "Connecting..." : "Google"}
-            </Button>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="register">Register</TabsTrigger>
+              </TabsList>
 
-            {/* <p className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  const registerTab = document.querySelector(
-                    '[value="register"]'
-                  ) as HTMLElement;
-                  if (registerTab) registerTab.click();
-                }}
-                className="text-primary underline underline-offset-4 hover:text-primary/90 p-0 m-0 h-auto bg-transparent"
-              >
-                Sign up
-              </button>
-            </p> */}
-          </TabsContent>
+              {/* Login Tab */}
+              <TabsContent value="login" className="space-y-4">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="youremail@example.com"
+                      value={loginData.email}
+                      onChange={handleLoginChange}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password</Label>
+                      <Link
+                        href="/forgot-password"
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Forgot Password?
+                      </Link>
+                    </div>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginData.password}
+                      onChange={handleLoginChange}
+                      required
+                    />
+                  </div>
 
-          {/* Register Tab */}
-          <TabsContent value="register" className="space-y-6">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName-register">First Name</Label>
-                  <Input
-                    id="firstName-register"
-                    placeholder="John"
-                    value={registerData.firstName}
-                    onChange={handleRegisterChange}
-                    required
-                  />
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  {statusMessage && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-600 text-sm">
+                      {statusMessage}
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={status === "submitting" || status === "success"}
+                  >
+                    {status === "submitting" ? "Signing in..." : "Sign In"}
+                  </Button>
+
+                  <div className="text-center">
+                    <span className="text-sm text-muted-foreground">
+                      Don&apos;t have an account?{" "}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline"
+                      onClick={() => {
+                        const registerTab =
+                          document.querySelector('[value="register"]');
+                        if (registerTab) (registerTab as HTMLElement).click();
+                      }}
+                    >
+                      Sign up
+                    </button>
+                  </div>
+                </form>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName-register">Last Name</Label>
-                  <Input
-                    id="lastName-register"
-                    placeholder="Doe"
-                    value={registerData.lastName}
-                    onChange={handleRegisterChange}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email-register">Email</Label>
-                <Input
-                  id="email-register"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={registerData.email}
-                  onChange={handleRegisterChange}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password-register">Password</Label>
-                <Input
-                  id="password-register"
-                  type="password"
-                  placeholder="••••••••"
-                  value={registerData.password}
-                  onChange={handleRegisterChange}
-                  required
-                  minLength={8}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword-register">
-                  Confirm Password
-                </Label>
-                <Input
-                  id="confirmPassword-register"
-                  type="password"
-                  placeholder="••••••••"
-                  value={registerData.confirmPassword}
-                  onChange={handleRegisterChange}
-                  required
-                />
-              </div>
-              <Button className="w-full" type="submit" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
-              </Button>
-            </form>
 
-            <div className="text-center text-sm text-muted-foreground">
-              <p>
-                By creating an account, you agree to our{" "}
-                <Link
-                  href="/terms"
-                  className="text-primary underline hover:text-primary/90"
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
                 >
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link
-                  href="/privacy"
-                  className="text-primary underline hover:text-primary/90"
-                >
-                  Privacy Policy
-                </Link>
-                .
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
+                  {googleLoading ? "Connecting..." : "Google"}
+                </Button>
+              </TabsContent>
+
+              {/* Register Tab */}
+              <TabsContent value="register" className="space-y-6">
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName-register">First Name</Label>
+                      <Input
+                        id="firstName-register"
+                        placeholder="John"
+                        value={registerData.firstName}
+                        onChange={handleRegisterChange}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName-register">Last Name</Label>
+                      <Input
+                        id="lastName-register"
+                        placeholder="Doe"
+                        value={registerData.lastName}
+                        onChange={handleRegisterChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email-register">Email</Label>
+                    <Input
+                      id="email-register"
+                      type="email"
+                      placeholder="john.doe@example.com"
+                      value={registerData.email}
+                      onChange={handleRegisterChange}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password-register">Password</Label>
+                    <Input
+                      id="password-register"
+                      type="password"
+                      placeholder="••••••••"
+                      value={registerData.password}
+                      onChange={handleRegisterChange}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Password must be at least 8 characters long
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword-register">
+                      Confirm Password
+                    </Label>
+                    <Input
+                      id="confirmPassword-register"
+                      type="password"
+                      placeholder="••••••••"
+                      value={registerData.confirmPassword}
+                      onChange={handleRegisterChange}
+                      required
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  {statusMessage && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-600 text-sm">
+                      {statusMessage}
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={status === "submitting" || status === "success"}
+                  >
+                    {status === "submitting" ? "Registering..." : "Register"}
+                  </Button>
+
+                  <div className="text-center">
+                    <span className="text-sm text-muted-foreground">
+                      Already have an account?{" "}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline"
+                      onClick={() => {
+                        const loginTab =
+                          document.querySelector('[value="login"]');
+                        if (loginTab) (loginTab as HTMLElement).click();
+                      }}
+                    >
+                      Login
+                    </button>
+                  </div>
+                </form>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  <p>
+                    By creating an account, you agree to our{" "}
+                    <Link
+                      href="/terms"
+                      className="text-primary underline hover:text-primary/90"
+                    >
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                      href="/privacy"
+                      className="text-primary underline hover:text-primary/90"
+                    >
+                      Privacy Policy
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

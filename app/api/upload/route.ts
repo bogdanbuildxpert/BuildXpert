@@ -7,6 +7,16 @@ import { authOptions } from "@/lib/auth";
 // Mark this route as dynamic since it uses cookies and form data
 export const dynamic = "force-dynamic";
 
+// Increase body size limit for file uploads
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb",
+    },
+    responseLimit: "10mb",
+  },
+};
+
 export async function POST(request: NextRequest) {
   try {
     // Get session from NextAuth

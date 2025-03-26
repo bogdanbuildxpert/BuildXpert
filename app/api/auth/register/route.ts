@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generateVerificationToken } from "@/lib/token";
 import { hash } from "bcrypt";
+import { transporter } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,16 +92,39 @@ export async function POST(request: NextRequest) {
     // Variable to track if email was sent successfully
     let emailSent = false;
 
-    // Send verification email
+    // Send verification email using a simple approach
     if (token) {
       try {
         console.log("[api/auth/register] Sending verification email...");
-        // Import the TypeScript email module
-        const { sendVerificationEmail } = await import("@/lib/email");
-        const emailResult = await sendVerificationEmail(email, token);
-        emailSent = emailResult?.success || false;
 
-        console.log("[api/auth/register] Email sending result:", emailResult);
+        const appUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.APP_URL ||
+          "http://localhost:3000";
+        const verificationLink = `${appUrl}/verify-email?token=${token}`;
+
+        // Simple email template
+        const content = `
+          <h2>Welcome to BuildXpert!</h2>
+          <p>Thank you for creating an account. Please verify your email address by clicking the link below:</p>
+          <p><a href="${verificationLink}">Verify Email Address</a></p>
+          <p>If the link doesn't work, copy and paste this URL into your browser:</p>
+          <p>${verificationLink}</p>
+        `;
+
+        // Send directly with nodemailer
+        await transporter.sendMail({
+          from:
+            process.env.EMAIL_FROM ||
+            process.env.EMAIL_SERVER_USER ||
+            "noreply@buildxpert.com",
+          to: email,
+          subject: "Verify your BuildXpert account",
+          html: content,
+        });
+
+        emailSent = true;
+        console.log("[api/auth/register] Verification email sent successfully");
       } catch (emailError) {
         console.error("[api/auth/register] Email sending failed:", emailError);
         // Continue with registration even if email fails
@@ -123,7 +147,7 @@ export async function POST(request: NextRequest) {
         ...userWithoutPassword,
         message: emailSent
           ? "Registration successful. Please check your email to verify your account."
-          : "Registration successful. Please contact support if you don't receive a verification email.",
+          : "Registration successful. Email verification is currently unavailable.",
       },
       { status: 201 }
     );

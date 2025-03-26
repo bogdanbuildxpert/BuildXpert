@@ -254,159 +254,62 @@ export async function sendEmail(options: {
 
 export const sendVerificationEmail = async (to: string, token: string) => {
   const appUrl = getAppUrl();
-
-  // For production, make sure to use the client-side route directly
-  // instead of the API route to avoid method not allowed errors
   const verificationLink = `${appUrl}/verify-email?token=${token}`;
 
-  // Debug logging for verification links (helpful for diagnosing issues)
-  console.log(`[EMAIL_DEBUG] Generated verification email for ${to}`);
-  console.log(`[EMAIL_DEBUG] App URL: ${appUrl}`);
-  console.log(
-    `[EMAIL_DEBUG] Token (first 10 chars): ${token.substring(0, 10)}...`
-  );
-  console.log(`[EMAIL_DEBUG] Verification link: ${verificationLink}`);
-  console.log(`[EMAIL_DEBUG] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(
-    `[EMAIL_DEBUG] Email server: ${process.env.EMAIL_SERVER_HOST}:${process.env.EMAIL_SERVER_PORT}`
-  );
+  // Simple debug logging
+  console.log(`Sending verification email to ${to}`);
+  console.log(`Verification link: ${verificationLink}`);
 
-  // Define result structure with proper types
-  const results: {
-    attempts: number;
-    success: boolean;
-    error: any;
-    messageId: string | null;
-  } = {
-    attempts: 0,
-    success: false,
-    error: null,
-    messageId: null,
-  };
+  try {
+    // Use a simplified email template
+    const subject = "Verify your BuildXpert account";
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
+      <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verificationLink}" 
+           style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+          Verify Email Address
+        </a>
+      </div>
+      <p style="color: #666; font-size: 14px;">
+        If you didn't create an account, you can safely ignore this email.
+      </p>
+      <p style="color: #666; font-size: 14px;">
+        If the button doesn't work, you can also copy and paste this link into your browser:
+        <br>
+        <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
+      </p>
+    `;
 
-  // Try sending with primary method up to 2 retries
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    results.attempts = attempt;
-    try {
-      console.log(`Sending verification email to ${to} (attempt ${attempt})`);
-
-      // Try to get template from database
-      let subject = "Verify your BuildXpert account";
-      let content = "";
-
-      try {
-        // Use a simplified approach to get templates to avoid potential JSON parsing errors
-        subject = "Verify your BuildXpert account";
-        content = `
-          <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
-          <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verificationLink}" 
-               style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-              Verify Email Address
-            </a>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't create an account, you can safely ignore this email.
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            If the button doesn't work, you can also copy and paste this link into your browser:
-            <br>
-            <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
-          </p>
-        `;
-      } catch (templateError) {
-        console.error(
-          "Could not load email template, using fallback:",
-          templateError
-        );
-        // Use fallback template if database template fails
-        content = `
-          <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
-          <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verificationLink}" 
-               style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-              Verify Email Address
-            </a>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't create an account, you can safely ignore this email.
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            If the button doesn't work, you can also copy and paste this link into your browser:
-            <br>
-            <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
-          </p>
-        `;
-      }
-
-      // Use direct transporter.sendMail instead of our enhanced email sending function
-      // to avoid any additional abstraction that could hide errors
-      const mailOptions = {
-        from: {
-          name: String(process.env.EMAIL_FROM_NAME || "BuildXpert"),
-          address: String(
+    // Send the email directly without bounce handling
+    const mailOptions = {
+      from: process.env.EMAIL_FROM_NAME
+        ? `"${process.env.EMAIL_FROM_NAME}" <${
             process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || ""
-          ),
-        },
-        to,
-        subject,
-        text: `Verify your BuildXpert account: ${verificationLink}`,
-        html: createEmailLayout(content),
-      };
+          }>`
+        : process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
+      to,
+      subject,
+      text: `Verify your BuildXpert account: ${verificationLink}`,
+      html: createEmailLayout(content),
+    };
 
-      // Send the email directly
-      const info = await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Verification email sent successfully to ${to}`);
 
-      console.log(`Verification email sent successfully to ${to}`, {
-        messageId: info.messageId,
-      });
-
-      results.success = true;
-      results.messageId = info.messageId || null;
-      return results;
-    } catch (error: any) {
-      console.error(
-        `Error sending verification email (attempt ${attempt}):`,
-        error
-      );
-
-      results.error = {
-        message: error.message,
-        code: error.code,
-        command: error.command,
-        responseCode: error.responseCode,
-      };
-
-      // Check for specific errors
-      if (
-        error.code === "ETIMEDOUT" ||
-        error.code === "ESOCKET" ||
-        error.code === "ECONNECTION"
-      ) {
-        console.error(
-          "Email server connection timeout. Please check your SMTP settings and server status."
-        );
-      }
-
-      // If it's the last attempt, return the error details
-      if (attempt === 3) {
-        console.error(
-          "Failed to send verification email after multiple attempts:",
-          results
-        );
-        return results;
-      }
-
-      // Otherwise wait before trying again
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+    return {
+      success: true,
+      messageId: info?.messageId || null,
+    };
+  } catch (error: any) {
+    console.error(`Error sending verification email:`, error);
+    return {
+      success: false,
+      error: error.message,
+    };
   }
-
-  return results;
 };
 
 export const sendContactConfirmationEmail = async (

@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { generateVerificationToken } from "@/lib/token";
 import { hash } from "bcrypt";
-// import { transporter } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("[api/auth/register] Registration request received");
+    console.log("[DEBUG REGISTER] Registration request received");
 
     // Parse the request body
     let body;
     try {
       body = await request.json();
-      console.log("[api/auth/register] Request body parsed", {
+      console.log("[DEBUG REGISTER] Request body parsed", {
         email: body.email,
       });
     } catch (parseError) {
       console.error(
-        "[api/auth/register] Failed to parse request body:",
+        "[DEBUG REGISTER] Failed to parse request body:",
         parseError
       );
       return NextResponse.json(
@@ -26,18 +24,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, password, role } = body;
+    const { name, email, password } = body;
 
     // Validate required fields
     if (!name || !email || !password) {
-      console.error("[api/auth/register] Missing required fields");
+      console.error("[DEBUG REGISTER] Missing required fields");
       return NextResponse.json(
         { error: "Name, email, and password are required" },
         { status: 400 }
       );
     }
 
-    console.log("[api/auth/register] Checking if user exists");
+    console.log("[DEBUG REGISTER] Checking if user exists");
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      console.log("[api/auth/register] User already exists:", { email });
+      console.log("[DEBUG REGISTER] User already exists:", { email });
       return NextResponse.json(
         { error: "User with this email already exists" },
         { status: 400 }
@@ -55,22 +53,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash the password
-    console.log("[api/auth/register] Hashing password");
+    console.log("[DEBUG REGISTER] Hashing password");
     const hashedPassword = await hash(password, 10);
 
     // Create the user
-    console.log("[api/auth/register] Creating new user");
+    console.log("[DEBUG REGISTER] Creating new user");
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
-        role: role || "CLIENT",
-        // Set emailVerified to true directly to bypass verification
+        role: "CLIENT",
+        // Set emailVerified to now to bypass verification
         emailVerified: new Date(),
       },
     });
-    console.log("[api/auth/register] User created successfully:", {
+    console.log("[DEBUG REGISTER] User created successfully:", {
       userId: user.id,
     });
 
@@ -81,21 +79,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...userWithoutPassword,
-        message:
-          "Registration successful. Your account has been verified automatically.",
+        message: "Debug registration successful. Your account is ready to use.",
       },
       { status: 201 }
     );
   } catch (error: any) {
     // Log detailed error for server-side debugging
-    console.error("[api/auth/register] Registration error:", {
+    console.error("[DEBUG REGISTER] Registration error:", {
       message: error.message,
       stack: error.stack,
       code: error.code,
     });
 
     return NextResponse.json(
-      { error: "Failed to register user: " + error.message },
+      {
+        error: "Failed to register user",
+        details: error.message,
+        code: error.code,
+      },
       { status: 500 }
     );
   }

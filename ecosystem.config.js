@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: "buildxpert",
-      script: "node_modules/next/dist/bin/next",
-      args: "start",
+      script: "server.js",
       instances: 1,
       exec_mode: "fork",
       autorestart: true,

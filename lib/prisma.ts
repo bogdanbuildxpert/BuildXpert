@@ -1,10 +1,42 @@
 // Import prisma-config first to ensure environment is correctly set up
 import "./prisma-config";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { Server as SocketServer, Socket } from "socket.io";
+import { Server as HttpServer } from "http";
 
 // Add prisma to the NodeJS global type
 declare global {
   var prisma: PrismaClient | undefined;
+}
+
+// Socket.io instance for notifications
+let io: SocketServer | null = null;
+
+// Initialize Socket.IO server
+export function initSocketServer(server: HttpServer) {
+  io = new SocketServer(server, {
+    cors: {
+      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+  });
+
+  io.on("connection", (socket: Socket) => {
+    console.log("Client connected:", socket.id);
+
+    // Join user-specific room when client connects
+    socket.on("join", (userId: string) => {
+      socket.join(`user_${userId}`);
+      console.log(`User ${userId} joined their room`);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Client disconnected:", socket.id);
+    });
+  });
+
+  return io;
 }
 
 // Check environment variables
@@ -107,5 +139,71 @@ export const prisma = global.prisma || createPrismaClient();
 if (process.env.NODE_ENV !== "production") {
   global.prisma = prisma;
 }
+
+// Function to mark messages as read using Prisma instead of direct SQL
+export async function markMessagesAsRead(jobId: string, receiverId: string) {
+  try {
+    // Update messages using Prisma
+    await prisma.message.updateMany({
+      where: {
+        jobId: jobId,
+        receiverId: receiverId,
+        isRead: false,
+      },
+      data: {
+        isRead: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Emit socket event for real-time updates
+    if (io) {
+      io.to(`user_${receiverId}`).emit("messages_read", {
+        jobId: jobId,
+        readBy: receiverId,
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    return false;
+  }
+}
+
+// Setup Prisma middleware for real-time notifications
+prisma.$use(async (params, next) => {
+  const result = await next(params);
+
+  // Detect new message creation
+  if (params.model === "Message" && params.action === "create") {
+    try {
+      if (io && result) {
+        // Fetch the complete message with user details using Prisma
+        const message = await prisma.message.findUnique({
+          where: { id: result.id },
+          include: {
+            sender: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+            receiver: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
+        });
+
+        if (message) {
+          // Emit to both sender and receiver
+          io.to(`user_${message.senderId}`).emit("new_message", message);
+          io.to(`user_${message.receiverId}`).emit("new_message", message);
+        }
+      }
+    } catch (error) {
+      console.error("Error handling message notification:", error);
+    }
+  }
+
+  return result;
+});
 
 export default prisma;

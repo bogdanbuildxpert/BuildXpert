@@ -5,21 +5,14 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 
-// Try to load the pg-notify module, but don't fail if it's not available
-let pgNotify;
+// Import Prisma for database operations and real-time notifications
+let prismaModule;
 try {
-  pgNotify = require("./lib/pg-notify");
-  console.log("PostgreSQL notification module loaded successfully");
+  prismaModule = require("./lib/prisma");
+  console.log("Prisma module loaded successfully");
 } catch (err) {
-  console.warn("Could not load PostgreSQL notification module:", err.message);
-  console.warn("Real-time messaging features will not be available");
-  // Create a mock object to prevent errors when functions are called
-  pgNotify = {
-    initSocketServer: () => ({ on: () => {}, emit: () => {} }),
-    initPgNotify: async () => false,
-    setupPgNotifyTriggers: async () => {},
-    closeConnections: async () => {},
-  };
+  console.error("Could not load Prisma module:", err.message);
+  process.exit(1); // Exit if Prisma cannot be loaded as it's critical
 }
 
 const dev = process.env.NODE_ENV !== "production";
@@ -77,42 +70,13 @@ app
 
       // Initialize Socket.IO with the HTTP server
       try {
-        const io = pgNotify.initSocketServer(server);
+        const io = prismaModule.initSocketServer(server);
         console.log("Socket.IO attached to HTTP server");
       } catch (socketError) {
         console.error("Error initializing Socket.IO:", socketError);
         console.warn(
           "Continuing without Socket.IO. Real-time features will not be available."
         );
-      }
-
-      // Initialize PostgreSQL LISTEN/NOTIFY
-      try {
-        pgNotify
-          .initPgNotify()
-          .then((success) => {
-            if (success) {
-              // Set up PostgreSQL triggers only if the initial connection was successful
-              pgNotify.setupPgNotifyTriggers().catch((err) => {
-                console.error("Error setting up PostgreSQL triggers:", err);
-                console.warn(
-                  "Continuing without database triggers. Real-time features may not work."
-                );
-              });
-            } else {
-              console.warn(
-                "PostgreSQL notification initialization was not successful."
-              );
-              console.warn("Continuing without real-time database updates.");
-            }
-          })
-          .catch((err) => {
-            console.error("Error initializing PostgreSQL notifications:", err);
-            console.warn("Continuing without real-time database updates.");
-          });
-      } catch (pgError) {
-        console.error("Error setting up PostgreSQL notifications:", pgError);
-        console.warn("Continuing without real-time database updates.");
       }
 
       // Start the server
@@ -127,7 +91,8 @@ app
       const handleShutdown = async () => {
         console.log("Shutting down server...");
         try {
-          await pgNotify.closeConnections();
+          // Disconnect Prisma client
+          await prismaModule.prisma.$disconnect();
           console.log("Database connections closed");
         } catch (error) {
           console.error("Error closing database connections:", error);

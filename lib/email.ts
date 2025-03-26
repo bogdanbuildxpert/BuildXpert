@@ -1,24 +1,20 @@
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 
-// Create email transporter with increased timeouts for AWS SES
+// Create email transporter with Google SMTP
 export const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_SERVER_HOST,
-  port: Number(process.env.EMAIL_SERVER_PORT || 2587), // Try alternative port 2587 if 587 is blocked
+  port: Number(process.env.EMAIL_SERVER_PORT || 587),
   secure: process.env.EMAIL_SERVER_SECURE === "true",
   auth: {
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
-  connectionTimeout: 60000, // 60 seconds
-  greetingTimeout: 60000, // 60 seconds
-  socketTimeout: 90000, // 90 seconds
+  connectionTimeout: 30000, // 30 seconds
+  greetingTimeout: 30000, // 30 seconds
+  socketTimeout: 60000, // 60 seconds
   debug: process.env.NODE_ENV !== "production", // Enable debug logging in non-production
   logger: process.env.NODE_ENV !== "production", // Enable logger in non-production
-  tls: {
-    // Do not fail on invalid certs
-    rejectUnauthorized: false,
-  },
 });
 
 // Verify transporter connection on startup and log success/failure

@@ -167,6 +167,7 @@ export async function middleware(request: NextRequest) {
     path === "/forgot-password" ||
     path === "/reset-password" ||
     path === "/verify-email" ||
+    path === "/resend-verification" ||
     path === "/debug-login"
   ) {
     // Special handling for the verify-email API endpoint in production
@@ -192,146 +193,33 @@ export async function middleware(request: NextRequest) {
 
   // Define protected routes that require admin access
   const isAdminProtectedRoute =
-    path.startsWith("/projects") ||
-    path.startsWith("/admin/dashboard") ||
-    path.startsWith("/admin/contacts");
+    path.startsWith("/admin/dashboard") || path.startsWith("/admin/contacts");
 
   // Define routes that require authentication (any user)
   const isAuthProtectedRoute =
     path.startsWith("/jobs/edit") ||
     path === "/post-job" ||
-    path.startsWith("/post-job/");
+    path.startsWith("/post-job/") ||
+    path.startsWith("/projects");
 
-  // CRITICAL PRODUCTION FIX: Skip all auth checks for post-job route
-  if (
-    (path === "/post-job" || path.startsWith("/post-job/")) &&
-    process.env.NODE_ENV === "production"
-  ) {
-    console.log(
-      `🚨 CRITICAL BYPASS: Allowing direct access to ${path} in production without auth checks`
-    );
-
-    // Just return with cache prevention headers
-    const response = NextResponse.next();
-    response.headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0"
-    );
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
-    response.headers.set("X-Bypass-Auth", "true");
-    return response;
-  }
-
-  // Special handling for post-job route in production with auth
-  if (
-    (path === "/post-job" || path.startsWith("/post-job/")) &&
-    process.env.NODE_ENV === "production"
-  ) {
-    console.log(`Special handling for ${path} in production`);
-
-    // Force all cache headers to prevent caching
-    const response = NextResponse.next();
-    response.headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0"
-    );
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
-
-    // If we have cookie authentication but no token, try to allow access
-    if (cookieUser && !token) {
-      console.log(
-        `Post-job special case: User has cookie auth but no token, allowing access`
-      );
-      return response;
-    }
-
-    // If neither authentication method is present, redirect to login
-    if (!cookieUser && !token) {
-      console.log(
-        `Post-job special case: No authentication present, redirecting to login`
-      );
-      const redirectUrl = new URL("/login", request.url);
-      redirectUrl.searchParams.set("from", path);
-      redirectUrl.searchParams.set("t", Date.now().toString());
-
-      const redirectResponse = NextResponse.redirect(redirectUrl);
-      redirectResponse.headers.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, max-age=0"
-      );
-      redirectResponse.headers.set("Pragma", "no-cache");
-      redirectResponse.headers.set("Expires", "0");
-
-      return redirectResponse;
-    }
-  }
-
-  // If it's an admin-protected route and the user is not an admin, redirect to login
+  // If it's an admin-protected route and user is not admin, redirect to login
   if (isAdminProtectedRoute && !isAdmin) {
-    // Create the URL to redirect to
-    const redirectUrl = new URL("/admin/login", request.url);
-    // Add the original URL as a parameter so we can redirect back after login
-    redirectUrl.searchParams.set("from", path);
-
     console.log(
-      `Redirecting non-admin user from ${path} to ${redirectUrl.toString()}`
+      `Access to admin protected route ${path} denied, redirecting to login`
     );
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
-  // If it's an auth-protected route and the user is not authenticated, redirect to login
+  // If it's a protected route and user is not authenticated, redirect to login
   if (isAuthProtectedRoute && !isAuthenticated) {
-    // Create the URL to redirect to
-    const redirectUrl = new URL("/login", request.url);
-    // Add the original URL as a parameter so we can redirect back after login
-    redirectUrl.searchParams.set("from", path);
-    // Add a timestamp to ensure the redirect isn't cached
-    redirectUrl.searchParams.set("t", Date.now().toString());
-
-    // Add a cache header to prevent browser caching of the redirect
-    const response = NextResponse.redirect(redirectUrl);
-    response.headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0"
-    );
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
-
-    // For production debugging - log the exact redirect
-    if (process.env.NODE_ENV === "production") {
-      console.log(
-        `PRODUCTION REDIRECT: User not authenticated for protected route ${path}. Redirecting to ${redirectUrl.toString()}`
-      );
-      // Log the cookies present, but sanitize the values
-      const cookieNames = Array.from(request.cookies.getAll()).map(
-        (c) => c.name
-      );
-      console.log(`Available cookies: ${cookieNames.join(", ")}`);
-    }
-
     console.log(
-      `Redirecting unauthenticated user from ${path} to ${redirectUrl.toString()}`
+      `Access to protected route ${path} denied, redirecting to login`
     );
-    return response;
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // For authenticated routes, add cache control headers
-  if (isAuthProtectedRoute && isAuthenticated) {
-    console.log(`User is authenticated, allowing access to ${path}`);
-    const response = NextResponse.next();
-    response.headers.set(
-      "Cache-Control",
-      "private, no-cache, no-store, must-revalidate, max-age=0"
-    );
-    response.headers.set("Pragma", "no-cache");
-    response.headers.set("Expires", "0");
-    return response;
-  }
-
-  console.log(`Allowing access to ${path}`);
-  return NextResponse.next();
+  // For all other routes, allow access
+  return response;
 }
 
 // See "Matching Paths" below to learn more

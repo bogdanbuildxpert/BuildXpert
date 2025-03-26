@@ -71,6 +71,7 @@ export const authOptions: NextAuthOptions = {
 
           // Check if the user's email is verified
           if (!user.emailVerified) {
+            console.log(`Login attempt for unverified email: ${user.email}`);
             throw new Error("Please verify your email before logging in");
           }
 
@@ -103,6 +104,12 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user, account }) {
+      console.log(
+        `Sign in attempt for ${user.email || "unknown"} with provider: ${
+          account?.provider || "credentials"
+        }`
+      );
+
       // If it's a Google login
       if (account?.provider === "google" && user.email) {
         // Check if user exists
@@ -136,6 +143,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (existingUser && !existingUser.emailVerified) {
+          console.log(`Sign in blocked: Email not verified for ${user.email}`);
           return false; // Prevent login if email is not verified
         }
       }

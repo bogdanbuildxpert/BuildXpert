@@ -15,11 +15,11 @@ export const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_SERVER_USER,
     pass: process.env.EMAIL_SERVER_PASSWORD,
   },
-  connectionTimeout: 30000, // 30 seconds
-  greetingTimeout: 30000, // 30 seconds
-  socketTimeout: 60000, // 60 seconds
-  debug: process.env.NODE_ENV !== "production", // Enable debug logging in non-production
-  logger: process.env.NODE_ENV !== "production", // Enable logger in non-production
+  connectionTimeout: 60000, // 60 seconds (increased from 30)
+  greetingTimeout: 60000, // 60 seconds (increased from 30)
+  socketTimeout: 120000, // 120 seconds (increased from 60)
+  debug: true, // Enable debug logging in all environments for troubleshooting
+  logger: true, // Enable logger in all environments for troubleshooting
 });
 
 // Verify transporter connection on startup and log success/failure
@@ -36,6 +36,7 @@ transporter.verify(function (error, success) {
         ? process.env.EMAIL_SERVER_USER.substring(0, 5) + "..."
         : "Not set",
       hasPassword: !!process.env.EMAIL_SERVER_PASSWORD,
+      env: process.env.NODE_ENV,
     });
   } else {
     console.log("Email server is ready to send messages");
@@ -265,12 +266,27 @@ export const sendVerificationEmail = async (to: string, token: string) => {
     `[EMAIL_DEBUG] Token (first 10 chars): ${token.substring(0, 10)}...`
   );
   console.log(`[EMAIL_DEBUG] Verification link: ${verificationLink}`);
-
-  // Log NODE_ENV to verify environment
   console.log(`[EMAIL_DEBUG] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(
+    `[EMAIL_DEBUG] Email server: ${process.env.EMAIL_SERVER_HOST}:${process.env.EMAIL_SERVER_PORT}`
+  );
+
+  // Define result structure with proper types
+  const results: {
+    attempts: number;
+    success: boolean;
+    error: any;
+    messageId: string | null;
+  } = {
+    attempts: 0,
+    success: false,
+    error: null,
+    messageId: null,
+  };
 
   // Try sending with primary method up to 2 retries
   for (let attempt = 1; attempt <= 3; attempt++) {
+    results.attempts = attempt;
     try {
       console.log(`Sending verification email to ${to} (attempt ${attempt})`);
 
@@ -311,41 +327,43 @@ export const sendVerificationEmail = async (to: string, token: string) => {
         `;
       }
 
-      // Use our enhanced email sending function
-      const result = await sendEmail({
+      // Use direct transporter.sendMail instead of our enhanced email sending function
+      // to avoid any additional abstraction that could hide errors
+      const mailOptions = {
+        from: {
+          name: String(process.env.EMAIL_FROM_NAME || "BuildXpert"),
+          address: String(
+            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || ""
+          ),
+        },
         to,
         subject,
+        text: `Verify your BuildXpert account: ${verificationLink}`,
         html: createEmailLayout(content),
-        from: {
-          name: process.env.EMAIL_FROM_NAME || "BuildXpert",
-          address:
-            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
-        },
+      };
+
+      // Send the email directly
+      const info = await transporter.sendMail(mailOptions);
+
+      console.log(`Verification email sent successfully to ${to}`, {
+        messageId: info.messageId,
       });
 
-      if (result.success) {
-        console.log(`Verification email sent successfully to ${to}`, {
-          messageId: result.messageId,
-        });
-        return result;
-      }
-
-      // If email is suppressed or in backoff, break the retry loop
-      if (
-        result.error?.includes("suppressed") ||
-        result.error?.includes("backoff")
-      ) {
-        console.warn(`Email to ${to} was not sent: ${result.error}`);
-        throw new Error(result.error);
-      }
-
-      // For other errors, continue with retries
-      throw new Error(result.error || "Unknown error");
+      results.success = true;
+      results.messageId = info.messageId || null;
+      return results;
     } catch (error: any) {
       console.error(
         `Error sending verification email (attempt ${attempt}):`,
         error
       );
+
+      results.error = {
+        message: error.message,
+        code: error.code,
+        command: error.command,
+        responseCode: error.responseCode,
+      };
 
       // Check for specific errors
       if (
@@ -358,17 +376,21 @@ export const sendVerificationEmail = async (to: string, token: string) => {
         );
       }
 
-      // If it's the last attempt, throw the error
+      // If it's the last attempt, return the error details
       if (attempt === 3) {
-        throw new Error(
-          "Failed to send verification email after multiple attempts"
+        console.error(
+          "Failed to send verification email after multiple attempts:",
+          results
         );
+        return results;
       }
 
       // Otherwise wait before trying again
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
+
+  return results;
 };
 
 export const sendContactConfirmationEmail = async (

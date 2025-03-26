@@ -82,11 +82,17 @@ export async function POST(request: NextRequest) {
     // Send verification email
     try {
       console.log("Sending verification email...");
-      await sendVerificationEmail(email, token);
-      console.log("Verification email sent successfully");
+      const emailResult = await sendVerificationEmail(email, token);
+      console.log("Verification email sent successfully", emailResult);
     } catch (emailError: any) {
-      console.error("Email sending failed:", emailError.message);
-      // Log the error but continue the flow
+      console.error("Email sending failed:", {
+        message: emailError.message,
+        stack: emailError.stack,
+        code: emailError.code,
+        command: emailError.command,
+        responseCode: emailError.responseCode,
+      });
+      // Log the error but continue the flow - we don't fail registration if email fails
     }
 
     // Remove password from response

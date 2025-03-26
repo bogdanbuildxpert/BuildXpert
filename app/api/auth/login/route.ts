@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Check if email is verified
     if (!user.emailVerified) {
+      console.log(`Login attempt for unverified email: ${email}`);
       return NextResponse.json(
         {
           error: "Please verify your email before logging in",

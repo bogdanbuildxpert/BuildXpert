@@ -5,16 +5,17 @@ module.exports = {
       script: "node_modules/next/dist/bin/next",
       args: "start",
       instances: 1,
-      exec_mode: "cluster",
+      exec_mode: "fork",
       autorestart: true,
       watch: false,
       max_memory_restart: "1G",
       env: {
         NODE_ENV: "production",
         PORT: 3000,
-        NEXTAUTH_URL: "http://localhost:3000",
+        NEXTAUTH_URL: "https://buildxpert.ie",
         NEXTAUTH_SECRET:
-          process.env.NEXTAUTH_SECRET || "your-development-secret-key", // Always use a real secret in production
+          process.env.NEXTAUTH_SECRET || "your-development-secret-key",
+        NODE_OPTIONS: "--max-old-space-size=768",
       },
       error_file: "logs/pm2-error.log",
       out_file: "logs/pm2-out.log",

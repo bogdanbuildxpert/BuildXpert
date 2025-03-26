@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "weather-server": {
+      "command": "node",
+      "args": ["~/mcp-quickstart/weather-server-typescript/build/index.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}

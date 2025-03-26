@@ -5,7 +5,7 @@ import "./globals.css";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { AuthProvider } from "@/lib/auth-context";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./providers";
 import dynamic from "next/dynamic";
 import Script from "next/script";
@@ -160,7 +160,7 @@ export default function RootLayout({
 
         <Providers>
           <AuthProvider>
-            <Toaster position="top-right" />
+            <Toaster />
             <div className="flex min-h-screen flex-col">
               <Navigation />
               <main className="flex-1">{children}</main>

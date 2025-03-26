@@ -217,21 +217,29 @@ export function useCookiePreferences() {
         });
 
         if (response.ok) {
-          toast.success("Cookie preferences updated successfully");
+          toast.success("Cookie preferences updated successfully", {
+            closeButton: true,
+          });
           return true;
         } else {
           const data = await response.json();
-          toast.error(data.error || "Failed to update cookie preferences");
+          toast.error(data.error || "Failed to update cookie preferences", {
+            closeButton: true,
+          });
           return false;
         }
       } else {
-        toast.success("Cookie preferences updated successfully");
+        toast.success("Cookie preferences updated successfully", {
+          closeButton: true,
+        });
         return true;
       }
     } catch (error) {
       if (!abortController.signal.aborted) {
         console.error("Error updating cookie preferences:", error);
-        toast.error("Failed to update cookie preferences");
+        toast.error("Failed to update cookie preferences", {
+          closeButton: true,
+        });
       }
       return false;
     }

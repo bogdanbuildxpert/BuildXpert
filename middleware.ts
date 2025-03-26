@@ -168,7 +168,10 @@ export async function middleware(request: NextRequest) {
     path === "/reset-password" ||
     path === "/verify-email" ||
     path === "/resend-verification" ||
-    path === "/debug-login"
+    path === "/debug-login" ||
+    path === "/debug" ||
+    path === "/debug-register" ||
+    path.startsWith("/api/debug/")
   ) {
     // Special handling for the verify-email API endpoint in production
     // This addresses the 405 Method Not Allowed issue when clicking email links

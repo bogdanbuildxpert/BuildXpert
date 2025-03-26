@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generateVerificationToken } from "@/lib/token";
 import { hash } from "bcrypt";
+import { sendVerificationEmail } from "@/lib/email";
 // import { transporter } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
@@ -66,13 +67,21 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         role: role || "CLIENT",
-        // Set emailVerified to true directly to bypass verification
-        emailVerified: new Date(),
+        // Email must be verified after registration
+        emailVerified: null,
       },
     });
     console.log("[api/auth/register] User created successfully:", {
       userId: user.id,
     });
+
+    // Generate and send verification token
+    console.log("[api/auth/register] Generating verification token");
+    const verificationToken = await generateVerificationToken(email);
+
+    // Send verification email
+    console.log("[api/auth/register] Sending verification email");
+    await sendVerificationEmail(email, verificationToken);
 
     // Remove password from response
     const { password: _password, ...userWithoutPassword } = user;
@@ -82,7 +91,7 @@ export async function POST(request: NextRequest) {
       {
         ...userWithoutPassword,
         message:
-          "Registration successful. Your account has been verified automatically.",
+          "Registration successful. Please check your email to verify your account.",
       },
       { status: 201 }
     );

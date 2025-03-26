@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
+import {
+  handleSMTPError,
+  isEmailSuppressed,
+  getEmailStatus,
+} from "@/lib/services/email-bounce";
 
 // Create email transporter with Google SMTP
 export const transporter = nodemailer.createTransport({
@@ -111,23 +116,158 @@ function getAppUrl(): string {
   // First, try to use NEXT_PUBLIC_APP_URL from environment
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
 
+  // Log all environment variables related to URLs for debugging
+  console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`NEXT_PUBLIC_APP_URL: ${process.env.NEXT_PUBLIC_APP_URL}`);
+  console.log(`APP_URL: ${process.env.APP_URL}`);
+
   // If environment variables are set, use them
   if (appUrl) {
+    console.log(`Using app URL from environment: ${appUrl}`);
     return appUrl;
   }
 
   // In production, default to your custom domain
   if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    console.log(`Using production URL: https://buildxpert.ie`);
     return "https://buildxpert.ie";
   }
 
   // In development, use localhost
+  console.log(`Using development URL: http://localhost:3000`);
   return "http://localhost:3000";
+}
+
+/**
+ * Check if an email is safe to send (not bounced/suppressed)
+ */
+export async function isEmailSafeToSend(email: string): Promise<{
+  safe: boolean;
+  reason?: string;
+  retryAfter?: Date;
+}> {
+  try {
+    // First check if it's a valid email format
+    if (!isValidEmailFormat(email)) {
+      return { safe: false, reason: "Invalid email format" };
+    }
+
+    // Check if the email is suppressed due to hard bounce
+    const isSuppressed = await isEmailSuppressed(email);
+    if (isSuppressed) {
+      return {
+        safe: false,
+        reason: "Email is suppressed due to previous hard bounce",
+      };
+    }
+
+    // Check if in backoff period due to soft bounce
+    const emailStatus = await getEmailStatus(email);
+    if (emailStatus.isInBackoff && emailStatus.retryAfter) {
+      return {
+        safe: false,
+        reason: "Email is in backoff period due to soft bounce",
+        retryAfter: emailStatus.retryAfter,
+      };
+    }
+
+    return { safe: true };
+  } catch (error) {
+    console.error("Error checking email safety:", error);
+    // Default to safe in case of error to prevent blocking email delivery
+    return { safe: true };
+  }
+}
+
+/**
+ * Basic email validation using regex
+ */
+function isValidEmailFormat(email: string): boolean {
+  const emailRegex =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Enhanced email sending with bounce handling
+ */
+export async function sendEmail(options: {
+  to: string;
+  subject: string;
+  text?: string;
+  html: string;
+  from?: {
+    name?: string;
+    address: string;
+  };
+  replyTo?: string;
+}) {
+  const { to, subject, text, html, from, replyTo } = options;
+
+  try {
+    // Check if email is safe to send
+    const safetyCheck = await isEmailSafeToSend(to);
+    if (!safetyCheck.safe) {
+      console.warn(`Skipping email to ${to}: ${safetyCheck.reason}`);
+      return {
+        success: false,
+        error: safetyCheck.reason,
+        retryAfter: safetyCheck.retryAfter,
+      };
+    }
+
+    // Prepare email options
+    const mailOptions = {
+      from: from || {
+        name: process.env.EMAIL_FROM_NAME || "BuildXpert",
+        address: process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
+      },
+      to,
+      subject,
+      text: text || html.replace(/<[^>]*>/g, ""), // Strip HTML if text not provided
+      html,
+      replyTo,
+    };
+
+    // Send the email
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log(
+      `Email sent successfully to ${to}. Message ID: ${info.messageId}`
+    );
+
+    return { success: true, messageId: info.messageId };
+  } catch (error: any) {
+    console.error(`Error sending email to ${to}:`, error);
+
+    // Handle the SMTP error for bounce tracking
+    await handleSMTPError(to, error);
+
+    return {
+      success: false,
+      error: error.message,
+      errorCode: error.responseCode || error.code,
+    };
+  }
 }
 
 export const sendVerificationEmail = async (to: string, token: string) => {
   const appUrl = getAppUrl();
+
+  // For production, make sure to use the client-side route directly
+  // instead of the API route to avoid method not allowed errors
   const verificationLink = `${appUrl}/verify-email?token=${token}`;
+
+  // Debug logging for verification links (helpful for diagnosing issues)
+  console.log(`[EMAIL_DEBUG] Generated verification email for ${to}`);
+  console.log(`[EMAIL_DEBUG] App URL: ${appUrl}`);
+  console.log(
+    `[EMAIL_DEBUG] Token (first 10 chars): ${token.substring(0, 10)}...`
+  );
+  console.log(`[EMAIL_DEBUG] Verification link: ${verificationLink}`);
+
+  // Log NODE_ENV to verify environment
+  console.log(`[EMAIL_DEBUG] NODE_ENV: ${process.env.NODE_ENV}`);
 
   // Try sending with primary method up to 2 retries
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -171,23 +311,36 @@ export const sendVerificationEmail = async (to: string, token: string) => {
         `;
       }
 
-      const mailOptions = {
+      // Use our enhanced email sending function
+      const result = await sendEmail({
+        to,
+        subject,
+        html: createEmailLayout(content),
         from: {
           name: process.env.EMAIL_FROM_NAME || "BuildXpert",
           address:
             process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
         },
-        to,
-        subject,
-        text: `Welcome to BuildXpert! Please verify your email by clicking this link: ${verificationLink}`,
-        html: createEmailLayout(content),
-      };
-
-      const result = await transporter.sendMail(mailOptions);
-      console.log(`Verification email sent successfully to ${to}`, {
-        messageId: result.messageId,
       });
-      return result;
+
+      if (result.success) {
+        console.log(`Verification email sent successfully to ${to}`, {
+          messageId: result.messageId,
+        });
+        return result;
+      }
+
+      // If email is suppressed or in backoff, break the retry loop
+      if (
+        result.error?.includes("suppressed") ||
+        result.error?.includes("backoff")
+      ) {
+        console.warn(`Email to ${to} was not sent: ${result.error}`);
+        throw new Error(result.error);
+      }
+
+      // For other errors, continue with retries
+      throw new Error(result.error || "Unknown error");
     } catch (error: any) {
       console.error(
         `Error sending verification email (attempt ${attempt}):`,

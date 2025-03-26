@@ -94,7 +94,49 @@ function VerifyEmailContent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
-    verifyEmail(token);
+    const status = searchParams.get("status");
+    const error = searchParams.get("error");
+
+    // If we have status or error parameters, it means verification was already processed by the API
+    if (status === "success") {
+      setStatus("success");
+      setMessage("Email verified successfully! You can now log in.");
+      return;
+    } else if (status === "already_verified") {
+      setStatus("success");
+      setMessage("Your email was already verified. You can now log in.");
+      return;
+    } else if (error) {
+      setStatus("error");
+
+      switch (error) {
+        case "invalid_token":
+          setMessage("The verification token is invalid or has expired.");
+          break;
+        case "user_not_found":
+          setMessage("We couldn't find a user with this email address.");
+          break;
+        case "invalid_format":
+          setMessage("The verification token has an invalid format.");
+          break;
+        case "verification_failed":
+          setMessage(
+            "Verification failed. Please try again or contact support."
+          );
+          break;
+        default:
+          setMessage("An error occurred during verification.");
+      }
+      return;
+    }
+
+    // If no status or error params, we need to verify the token on our own
+    if (token) {
+      verifyEmail(token);
+    } else {
+      setStatus("error");
+      setMessage("Verification token is missing.");
+    }
   }, [searchParams]);
 
   return (

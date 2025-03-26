@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generatePasswordResetToken } from "@/lib/token";
 import { sendPasswordResetEmail } from "@/lib/email";
-import { sendPasswordResetEmailWithSesApi } from "@/lib/ses-email";
-import { sendPasswordResetEmailWithSesApiV2 } from "@/lib/ses-email-v2";
 import * as crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -35,44 +33,14 @@ export async function POST(req: Request) {
     // Generate password reset token using JWT
     const token = generatePasswordResetToken(email);
 
-    // Send password reset email with error handling for DigitalOcean
+    // Send password reset email
     try {
-      console.log(
-        "Attempting to send password reset email via primary method (SMTP)..."
-      );
+      console.log("Sending password reset email...");
       await sendPasswordResetEmail(email, token);
-      console.log("Password reset email sent successfully via SMTP");
+      console.log("Password reset email sent successfully");
     } catch (emailError: any) {
-      console.error(
-        "SMTP password reset email sending failed:",
-        emailError.message
-      );
-
-      // If we're on DigitalOcean and hit a timeout, try the SES API
-      if (
-        emailError.code === "ETIMEDOUT" ||
-        emailError.code === "ESOCKET" ||
-        emailError.code === "ECONNECTION"
-      ) {
-        console.log(
-          "Attempting fallback password reset email delivery via SES API..."
-        );
-
-        try {
-          // Try using the SES API v2 as a fallback for network issues
-          await sendPasswordResetEmailWithSesApiV2(email, token);
-          console.log("Password reset email sent successfully via SES API v2");
-        } catch (sesError) {
-          console.error(
-            "Both SMTP and SES API delivery methods failed:",
-            sesError
-          );
-          // We'll continue the flow but log the error
-        }
-      } else {
-        // For other errors, just log them
-        console.error("Email sending failed (non-timeout error):", emailError);
-      }
+      console.error("Password reset email sending failed:", emailError.message);
+      // Log the error but continue the flow
     }
 
     return NextResponse.json(

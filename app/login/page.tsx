@@ -36,6 +36,10 @@ function LoginPageContent() {
   const redirectUrl =
     searchParams.get("redirect") || searchParams.get("from") || "/";
 
+  // Get the tab parameter to determine which tab to show initially
+  const activeTab =
+    searchParams.get("tab") === "register" ? "register" : "login";
+
   // Remove the redundant redirection code since middleware handles it now
   // Just keep a log message for debugging
   useEffect(() => {
@@ -273,7 +277,7 @@ function LoginPageContent() {
           </p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue={activeTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger id="login-tab" value="login">
               Login
@@ -340,7 +344,7 @@ function LoginPageContent() {
               {googleLoading ? "Connecting..." : "Google"}
             </Button>
 
-            <p className="text-center text-sm text-muted-foreground">
+            {/* <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
               <button
                 type="button"
@@ -354,7 +358,7 @@ function LoginPageContent() {
               >
                 Sign up
               </button>
-            </p>
+            </p> */}
           </TabsContent>
 
           {/* Register Tab */}

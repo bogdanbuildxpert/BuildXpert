@@ -140,6 +140,27 @@ export default function AdminDashboardPage() {
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
+            <Link href="/admin/bounces" className="flex items-center space-x-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 2.38 10 4v2c0 .53-.25 1-.6 1.42" />
+                <path d="M20 10v3.38c0 1.12-.63 3.12-1.5 4.12" />
+                <path d="M12 2h.05a8.95 8.95 0 0 1 8.95 8.95V12" />
+                <circle cx="12" cy="16" r="6" />
+                <path d="m9 17 3-3 3 3" />
+              </svg>
+              <span>Email Bounces</span>
+            </Link>
+          </Button>
+          <Button variant="ghost" className="justify-start" asChild>
             <Link
               href="/admin/analytics"
               className="flex items-center space-x-2"

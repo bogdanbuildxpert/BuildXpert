@@ -150,6 +150,27 @@ model EmailTemplate {
   @@index([name])
 }
 
+model EmailBounce {
+  id             String       @id @default(cuid())
+  email          String
+  messageId      String?
+  bounceType     BounceType   @default(UNDETERMINED)
+  bounceCategory String?
+  reason         String?
+  action         String?
+  status         BounceStatus @default(NEW)
+  diagnosticCode String?
+  timestamp      DateTime     @default(now())
+  retryCount     Int          @default(0)
+  retryAfter     DateTime?
+  handled        Boolean      @default(false)
+  
+  @@index([email])
+  @@index([bounceType])
+  @@index([status])
+  @@index([timestamp])
+}
+
 enum UserRole {
   ADMIN
   CLIENT
@@ -193,4 +214,17 @@ enum ContactStatus {
   REVIEWED
   RESPONDED
   ARCHIVED
+}
+
+enum BounceType {
+  HARD
+  SOFT
+  UNDETERMINED
+}
+
+enum BounceStatus {
+  NEW
+  PROCESSED
+  IGNORED
+  RESOLVED
 }

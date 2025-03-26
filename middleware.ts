@@ -169,6 +169,24 @@ export async function middleware(request: NextRequest) {
     path === "/verify-email" ||
     path === "/debug-login"
   ) {
+    // Special handling for the verify-email API endpoint in production
+    // This addresses the 405 Method Not Allowed issue when clicking email links
+    if (
+      path === "/api/auth/verify-email" &&
+      process.env.NODE_ENV === "production"
+    ) {
+      console.log(
+        "Production verify-email API access detected, forcing to client route"
+      );
+      const token = request.nextUrl.searchParams.get("token");
+
+      if (token) {
+        return NextResponse.redirect(
+          new URL(`/verify-email?token=${token}`, request.url)
+        );
+      }
+    }
+
     return response;
   }
 

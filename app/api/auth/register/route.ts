@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { generateVerificationToken } from "@/lib/token";
 import { sendVerificationEmail } from "@/lib/email";
-import { sendVerificationEmailWithSesApi } from "@/lib/ses-email";
-import { sendVerificationEmailWithSesApiV2 } from "@/lib/ses-email-v2";
 import { hash } from "bcrypt";
 import crypto from "crypto";
 
@@ -76,48 +74,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate email verification token
-    const token = crypto.randomBytes(32).toString("hex");
-    await prisma.verificationToken.create({
-      data: {
-        identifier: email,
-        token,
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      },
-    });
+    const token = generateVerificationToken(email);
+    console.log(
+      `[api/auth/register] Generated verification token for: ${email} (length: ${token.length})`
+    );
 
-    // Send verification email with error handling for DigitalOcean environments
+    // Send verification email
     try {
-      console.log(
-        "Attempting to send verification email via primary method (SMTP)..."
-      );
+      console.log("Sending verification email...");
       await sendVerificationEmail(email, token);
-      console.log("Verification email sent successfully via SMTP");
+      console.log("Verification email sent successfully");
     } catch (emailError: any) {
-      console.error("SMTP email sending failed:", emailError.message);
-
-      // If we're on DigitalOcean and hit a timeout, try the SES API
-      if (
-        emailError.code === "ETIMEDOUT" ||
-        emailError.code === "ESOCKET" ||
-        emailError.code === "ECONNECTION"
-      ) {
-        console.log("Attempting fallback email delivery via SES API...");
-
-        try {
-          // Try using the SES API v2 as a fallback for network issues
-          await sendVerificationEmailWithSesApiV2(email, token);
-          console.log("Verification email sent successfully via SES API v2");
-        } catch (sesError) {
-          console.error(
-            "Both SMTP and SES API delivery methods failed:",
-            sesError
-          );
-          // We'll continue the flow but log the error
-        }
-      } else {
-        // For other errors, just log them
-        console.error("Email sending failed (non-timeout error):", emailError);
-      }
+      console.error("Email sending failed:", emailError.message);
+      // Log the error but continue the flow
     }
 
     // Remove password from response

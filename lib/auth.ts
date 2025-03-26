@@ -69,6 +69,11 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Invalid credentials");
           }
 
+          // Check if the user's email is verified
+          if (!user.emailVerified) {
+            throw new Error("Please verify your email before logging in");
+          }
+
           return {
             id: user.id,
             name: user.name,
@@ -113,8 +118,25 @@ export const authOptions: NextAuthOptions = {
               name: user.name || "",
               password: "", // Empty password for Google users
               role: "CLIENT", // Default role for Google sign-ins
+              emailVerified: new Date(), // Auto-verify Google accounts since they're already verified
             },
           });
+        } else if (!existingUser.emailVerified) {
+          // For Google logins, we can consider the email automatically verified
+          // but we need to update existing unverified accounts
+          await prisma.user.update({
+            where: { email: user.email },
+            data: { emailVerified: new Date() },
+          });
+        }
+      } else if (!account?.provider && user.email) {
+        // For credentials login, check if email is verified
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+
+        if (existingUser && !existingUser.emailVerified) {
+          return false; // Prevent login if email is not verified
         }
       }
       return true;

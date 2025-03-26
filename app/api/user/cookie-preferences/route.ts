@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-import { Prisma, User } from "@prisma/client";
+import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
+
+// Mark this route as dynamic since it uses cookies() and headers()
+export const dynamic = "force-dynamic";
 
 const COOKIE_CONSENT_KEY = "cookie-consent";
 
@@ -42,13 +45,11 @@ export async function PUT(req: Request) {
 
     // If user is logged in, update their preferences in the database
     if (session?.user?.email) {
-      const updateData: Prisma.UserUpdateInput = {
-        cookiePreferences: cookiePreferences as unknown as Prisma.JsonValue,
-      };
-
       await prisma.user.update({
         where: { email: session.user.email },
-        data: updateData,
+        data: {
+          cookiePreferences: cookiePreferences as unknown as Prisma.JsonValue,
+        },
       });
     }
 
@@ -107,9 +108,6 @@ export async function GET(req: Request) {
     // For logged-in users, get preferences from database
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: {
-        cookiePreferences: true,
-      } as const,
     });
 
     if (!user?.cookiePreferences) {
@@ -119,6 +117,7 @@ export async function GET(req: Request) {
       );
     }
 
+    // Cast the JSON value to our interface type
     const preferences = user.cookiePreferences as unknown as CookiePreferences;
     return NextResponse.json(
       { cookiePreferences: preferences },

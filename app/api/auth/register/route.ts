@@ -82,7 +82,25 @@ export async function POST(request: NextRequest) {
     // Send verification email
     try {
       console.log("Sending verification email...");
-      const emailResult = await sendVerificationEmail(email, token);
+
+      // Use the CommonJS email module in production Node.js environments
+      let emailResult;
+      try {
+        // Try CommonJS module first for production Node.js
+        const emailModule = require("../../../../lib/email.js");
+        emailResult = await emailModule.sendVerificationEmail(email, token);
+        console.log("Used CommonJS email module");
+      } catch (error) {
+        // Fall back to TypeScript module
+        const moduleError = error as Error;
+        console.log(
+          "Falling back to TypeScript email module:",
+          moduleError.message
+        );
+        const { sendVerificationEmail } = await import("@/lib/email");
+        emailResult = await sendVerificationEmail(email, token);
+      }
+
       console.log("Verification email sent successfully", emailResult);
     } catch (emailError: any) {
       console.error("Email sending failed:", {

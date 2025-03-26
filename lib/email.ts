@@ -295,11 +295,27 @@ export const sendVerificationEmail = async (to: string, token: string) => {
       let content = "";
 
       try {
-        const template = await getProcessedTemplate("email_verification", {
-          verificationLink,
-        });
-        subject = template.subject;
-        content = template.content;
+        // Use a simplified approach to get templates to avoid potential JSON parsing errors
+        subject = "Verify your BuildXpert account";
+        content = `
+          <h2 style="color: #333; margin-bottom: 20px;">Welcome to BuildXpert!</h2>
+          <p>Thank you for creating an account. Please verify your email address by clicking the button below:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationLink}" 
+               style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+              Verify Email Address
+            </a>
+          </div>
+          <p style="color: #666; font-size: 14px;">
+            If you didn't create an account, you can safely ignore this email.
+          </p>
+          <p style="color: #666; font-size: 14px;">
+            If the button doesn't work, you can also copy and paste this link into your browser:
+            <br>
+            <a href="${verificationLink}" style="color: #0070f3; word-break: break-all;">${verificationLink}</a>
+          </p>
+        `;
       } catch (templateError) {
         console.error(
           "Could not load email template, using fallback:",

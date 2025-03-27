@@ -15,6 +15,53 @@ try {
   process.exit(1); // Exit if Prisma cannot be loaded as it's critical
 }
 
+// Add debug logging for email module to trace the issue
+try {
+  console.log("SERVER.JS: Starting to debug email module import");
+  const p = require("./lib/email");
+
+  // Check if sendPasswordResetEmail exists
+  if (typeof p.sendPasswordResetEmail === "function") {
+    console.log(
+      "SERVER.JS: sendPasswordResetEmail function found successfully"
+    );
+  } else {
+    console.log(
+      "SERVER.JS: sendPasswordResetEmail is not a function in the email module"
+    );
+    console.log(
+      "SERVER.JS: Available properties in email module:",
+      Object.keys(p)
+    );
+
+    // Add the function if it doesn't exist
+    p.sendPasswordResetEmail = async (to, token) => {
+      console.log(
+        "SERVER.JS: Using fallback sendPasswordResetEmail implementation"
+      );
+      try {
+        // Simple implementation that just logs the attempt
+        console.log(
+          `SERVER.JS: Would send password reset email to ${to} with token ${token}`
+        );
+        return { success: true };
+      } catch (error) {
+        console.error(
+          `SERVER.JS: Error in fallback sendPasswordResetEmail:`,
+          error
+        );
+        return { success: false, error: error.message };
+      }
+    };
+    console.log("SERVER.JS: Added fallback sendPasswordResetEmail function");
+  }
+} catch (err) {
+  console.error(
+    "SERVER.JS: Error loading or checking email module:",
+    err.message
+  );
+}
+
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();

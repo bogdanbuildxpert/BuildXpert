@@ -463,94 +463,101 @@ export const sendPasswordResetEmail = async (to: string, token: string) => {
   const appUrl = getAppUrl();
   const resetLink = `${appUrl}/reset-password?token=${token}`;
 
-  // Try sending with primary method up to 2 retries
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // Simple debug logging
+  console.log(`Sending password reset email to ${to}`);
+  console.log(`Password reset link: ${resetLink}`);
+
+  try {
+    // Try to get template from database
+    let subject = "Reset Your BuildXpert Password";
+    let content = "";
+
     try {
-      console.log(`Sending password reset email to ${to} (attempt ${attempt})`);
-
-      // Try to get template from database
-      let subject = "Reset Your BuildXpert Password";
-      let content = "";
-
-      try {
-        const template = await getProcessedTemplate("password_reset", {
-          resetLink,
-        });
-        subject = template.subject;
-        content = template.content;
-      } catch (templateError) {
-        console.error(
-          "Could not load email template, using fallback:",
-          templateError
-        );
-        // Use fallback template if database template fails
-        content = `
-          <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
-          <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetLink}" 
-               style="background-color: #0070f3; color: white; padding: 12px 24px; 
-                      text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-              Reset Password
-            </a>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            This link will expire in 1 hour for security reasons.
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            If the button doesn't work, you can also copy and paste this link into your browser:
-            <br>
-            <a href="${resetLink}" style="color: #0070f3; word-break: break-all;">${resetLink}</a>
-          </p>
-        `;
-      }
-
-      const mailOptions = {
-        from: {
-          name: process.env.EMAIL_FROM_NAME || "BuildXpert Support",
-          address:
-            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
-        },
-        to,
-        subject,
-        text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
-        html: createEmailLayout(content),
-      };
-
-      const result = await transporter.sendMail(mailOptions);
-      console.log(`Password reset email sent successfully to ${to}`, {
-        messageId: result.messageId,
+      const template = await getProcessedTemplate("password_reset", {
+        resetLink,
       });
-      return result;
-    } catch (error: any) {
+      subject = template.subject;
+      content = template.content;
+    } catch (templateError) {
       console.error(
-        `Error sending password reset email (attempt ${attempt}):`,
-        error
+        "Could not load email template, using fallback:",
+        templateError
       );
-
-      // Check for specific errors
-      if (
-        error.code === "ETIMEDOUT" ||
-        error.code === "ESOCKET" ||
-        error.code === "ECONNECTION"
-      ) {
-        console.error(
-          "Email server connection timeout. Please check your SMTP settings and server status."
-        );
-      }
-
-      // If it's the last attempt, throw the error
-      if (attempt === 3) {
-        throw new Error(
-          "Failed to send password reset email after multiple attempts"
-        );
-      }
-
-      // Otherwise wait before trying again
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Use fallback template if database template fails
+      content = `
+        <h2 style="color: #333; margin-bottom: 20px;">Reset Your Password</h2>
+        <p>We received a request to reset your password for your BuildXpert account. Click the button below to set a new password:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetLink}" 
+             style="background-color: #0070f3; color: white; padding: 12px 24px; 
+                    text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+            Reset Password
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px;">
+          This link will expire in 1 hour for security reasons.
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          If the button doesn't work, you can also copy and paste this link into your browser:
+          <br>
+          <a href="${resetLink}" style="color: #0070f3; word-break: break-all;">${resetLink}</a>
+        </p>
+      `;
     }
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM_NAME
+        ? `"${process.env.EMAIL_FROM_NAME}" <${
+            process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || ""
+          }>`
+        : process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER || "",
+      to,
+      subject,
+      text: `Reset your BuildXpert password by clicking this link: ${resetLink}. This link will expire in 1 hour.`,
+      html: createEmailLayout(content),
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`Password reset email sent successfully to ${to}`, {
+      messageId: result.messageId,
+    });
+
+    return {
+      success: true,
+      messageId: result.messageId || null,
+    };
+  } catch (error: any) {
+    console.error(`Error sending password reset email:`, error);
+
+    // Check for specific errors
+    if (
+      error.code === "ETIMEDOUT" ||
+      error.code === "ESOCKET" ||
+      error.code === "ECONNECTION"
+    ) {
+      console.error(
+        "Email server connection timeout. Please check your SMTP settings and server status."
+      );
+    }
+
+    return {
+      success: false,
+      error: error.message,
+    };
   }
 };
+
+// Add CommonJS exports for backward compatibility
+// @ts-ignore - This is added for compatibility with JavaScript modules
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    transporter,
+    getAppUrl,
+    createEmailLayout,
+    sendPasswordResetEmail,
+    sendVerificationEmail,
+  };
+}

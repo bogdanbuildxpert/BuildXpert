@@ -14,7 +14,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { signIn } from "next-auth/react";
+import { signIn, getSession, signOut, useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Separator } from "@/components/ui/separator";
@@ -86,25 +86,61 @@ function LoginPageContent() {
     setError("");
 
     try {
-      const response = await signIn("credentials", {
+      console.log("Starting login process with credentials");
+
+      const result = await signIn("credentials", {
         redirect: false,
         email: loginData.email,
         password: loginData.password,
       });
 
-      if (response?.error) {
-        setStatus("error");
-        setError(response.error);
-        return;
+      console.log("Sign in result:", result);
+
+      if (result?.error) {
+        throw new Error(result.error);
       }
 
-      // Redirect on successful login
-      setStatus("success");
-      setStatusMessage("Login successful! Redirecting...");
-      router.push(redirectUrl);
+      if (!result?.ok) {
+        throw new Error("Login failed - please try again");
+      }
+
+      // Simple success message
+      toast.success("Login successful!");
+
+      // Use a client-side approach that works better with NextAuth
+      try {
+        // First update the session
+        await fetch("/api/auth/session", {
+          method: "GET",
+          credentials: "include", // Important to include credentials for cookies
+          headers: {
+            "Cache-Control": "no-cache, no-store, max-age=0",
+            Pragma: "no-cache",
+          },
+        });
+
+        console.log("Session refreshed");
+
+        // Longer timeout to ensure everything is established
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Now do a hard reload to the destination to ensure all
+        // cookies and state are properly established
+        const destination = result?.url || redirectUrl;
+        window.location.href = destination;
+      } catch (sessionError) {
+        console.error("Error refreshing session:", sessionError);
+        // Fallback to redirect anyway
+        window.location.href = redirectUrl;
+      }
     } catch (error) {
-      setStatus("error");
-      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to login");
+
+      // Clear any partial session state
+      await signOut({ redirect: false });
+    } finally {
+      setIsLoading(false);
     }
   };
 

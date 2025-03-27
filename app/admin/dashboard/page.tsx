@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
             </Link>
           </Button>
           <Button variant="ghost" className="justify-start" asChild>
-            <Link href="/admin/jobs" className="flex items-center space-x-2">
+            <Link href="/jobs" className="flex items-center space-x-2">
               <Calendar className="h-5 w-5" />
               <span>Jobs</span>
             </Link>
@@ -158,24 +158,6 @@ export default function AdminDashboardPage() {
                 <path d="m9 17 3-3 3 3" />
               </svg>
               <span>Email Bounces</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" className="justify-start" asChild>
-            <Link
-              href="/admin/analytics"
-              className="flex items-center space-x-2"
-            >
-              <BarChart className="h-5 w-5" />
-              <span>Analytics</span>
-            </Link>
-          </Button>
-          <Button variant="ghost" className="justify-start" asChild>
-            <Link
-              href="/admin/settings"
-              className="flex items-center space-x-2"
-            >
-              <Settings className="h-5 w-5" />
-              <span>Settings</span>
             </Link>
           </Button>
         </nav>

@@ -314,7 +314,7 @@ function LoginPageContent() {
                     {status === "submitting" ? "Signing in..." : "Sign In"}
                   </Button>
 
-                  <div className="text-center">
+                  {/* <div className="text-center">
                     <span className="text-sm text-muted-foreground">
                       Don&apos;t have an account?{" "}
                     </span>
@@ -329,7 +329,7 @@ function LoginPageContent() {
                     >
                       Sign up
                     </button>
-                  </div>
+                  </div> */}
                 </form>
 
                 <div className="relative">

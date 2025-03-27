@@ -48,7 +48,7 @@ export async function PUT(req: Request) {
       await prisma.user.update({
         where: { email: session.user.email },
         data: {
-          cookiePreferences: cookiePreferences as unknown as Prisma.JsonValue,
+          cookiePreferences: cookiePreferences as any,
         },
       });
     }
@@ -57,7 +57,10 @@ export async function PUT(req: Request) {
     cookies().set(COOKIE_CONSENT_KEY, JSON.stringify(cookiePreferences), {
       path: "/",
       maxAge: 60 * 60 * 24 * 365, // 1 year
-      secure: process.env.NODE_ENV === "production",
+      // Improve secure flag detection to handle both development and production
+      secure:
+        process.env.NODE_ENV === "production" ||
+        req.headers.get("x-forwarded-proto") === "https",
       sameSite: "lax",
     });
 

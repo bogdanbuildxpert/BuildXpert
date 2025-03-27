@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
-interface CookiePreferences {
+export interface CookiePreferences {
   essential: boolean;
   analytics: boolean;
   preferences: boolean;
@@ -49,7 +49,7 @@ const getCookiePreferences = (): CookiePreferences | null => {
         }
         // Ensure essential cookies are always true
         preferences.essential = true;
-        // Ensure hasConsented is included
+        // Explicitly check and set hasConsented field based on presence of cookie
         preferences.hasConsented = true;
         return preferences;
       } catch (parseError) {
@@ -82,7 +82,13 @@ const setCookiePreferences = (preferences: CookiePreferences) => {
       "path=/",
       `max-age=${60 * 60 * 24 * 365}`, // 1 year
       "samesite=lax",
-      process.env.NODE_ENV === "production" ? "secure" : "",
+      // Ensure secure flag is set in production or when on HTTPS
+      isBrowser &&
+      (window.location.protocol === "https:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+        ? "secure"
+        : "",
     ]
       .filter(Boolean)
       .join("; ");
@@ -94,42 +100,57 @@ const setCookiePreferences = (preferences: CookiePreferences) => {
 };
 
 export function useCookiePreferences() {
-  const { user } = useAuth();
+  // Always call hooks unconditionally at the top level
+  const auth = useAuth();
+  const user = auth?.user || null;
+
   const [cookiePreferences, setPreferences] =
     useState<CookiePreferences>(defaultPreferences);
   const [isLoading, setIsLoading] = useState(true);
   const [hasConsented, setHasConsented] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Safe initialization effect to detect client-side mounting
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
 
   // Initialize preferences from cookies - only runs in browser
   useEffect(() => {
-    if (isBrowser) {
-      // Try to get stored preferences on initial mount
-      const stored = getCookiePreferences();
-      if (stored) {
-        setPreferences(stored);
-        setHasConsented(stored?.hasConsented || false);
-      }
+    // Only run on client side and after component is mounted
+    if (!isMounted) return;
+
+    // Try to get stored preferences on initial mount
+    const stored = getCookiePreferences();
+    if (stored) {
+      setPreferences(stored);
+      // If the cookie exists, the user has explicitly consented
+      setHasConsented(true);
     }
-  }, []);
+    setIsLoading(false);
+  }, [isMounted]);
 
   // Load cookie preferences on mount and when user changes
   useEffect(() => {
-    if (!isBrowser) return;
+    // Only run on client side and after component is mounted
+    if (!isMounted) return;
+    if (!user) return;
 
-    let isMounted = true;
     let abortController = new AbortController();
+    let componentMounted = true;
 
     const loadPreferences = async () => {
       try {
         // First check browser cookies
         const storedPreferences = getCookiePreferences();
-        if (storedPreferences && isMounted) {
+        if (storedPreferences && componentMounted) {
           setPreferences(storedPreferences);
-          setHasConsented(true); // If we have stored preferences, user has consented
-          setIsLoading(false);
+          // Having cookie preferences directly indicates consent
+          setHasConsented(true);
 
           // If user is logged in, sync cookie preferences to database
-          if (user && isMounted) {
+          if (componentMounted) {
             try {
               await fetch("/api/user/cookie-preferences", {
                 method: "PUT",
@@ -150,7 +171,7 @@ export function useCookiePreferences() {
         }
 
         // If no cookie preferences found and user is logged in, try to load from database
-        if (user && isMounted) {
+        if (componentMounted) {
           try {
             const response = await fetch("/api/user/cookie-preferences", {
               method: "GET",
@@ -158,7 +179,7 @@ export function useCookiePreferences() {
               signal: abortController.signal,
             });
 
-            if (response.ok && isMounted) {
+            if (response.ok && componentMounted) {
               const data = await response.json();
               const dbPreferences =
                 data.cookiePreferences || defaultPreferences;
@@ -178,14 +199,9 @@ export function useCookiePreferences() {
             }
           }
         }
-
-        if (isMounted) {
-          setIsLoading(false);
-        }
       } catch (error) {
-        if (isMounted) {
+        if (componentMounted) {
           console.error("Error in loadPreferences:", error);
-          setIsLoading(false);
         }
       }
     };
@@ -193,10 +209,10 @@ export function useCookiePreferences() {
     loadPreferences();
 
     return () => {
-      isMounted = false;
+      componentMounted = false;
       abortController.abort();
     };
-  }, [user]);
+  }, [user, isMounted]);
 
   const updateCookiePreferences = async (
     newPreferences: Partial<CookiePreferences>
@@ -220,25 +236,34 @@ export function useCookiePreferences() {
 
       // If user is logged in, also update database
       if (user) {
-        const response = await fetch("/api/user/cookie-preferences", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cookiePreferences: updatedPreferences,
-          }),
-          signal: abortController.signal,
-        });
-
-        if (response.ok) {
-          toast.success("Cookie preferences updated successfully", {
-            closeButton: true,
+        try {
+          const response = await fetch("/api/user/cookie-preferences", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              cookiePreferences: updatedPreferences,
+            }),
+            signal: abortController.signal,
           });
-          return true;
-        } else {
-          const data = await response.json();
-          toast.error(data.error || "Failed to update cookie preferences", {
+
+          if (response.ok) {
+            toast.success("Cookie preferences updated successfully", {
+              closeButton: true,
+            });
+            return true;
+          } else {
+            const data = await response.json();
+            console.error("API error:", data);
+            toast.error(data.error || "Failed to update cookie preferences", {
+              closeButton: true,
+            });
+            return false;
+          }
+        } catch (apiError) {
+          console.error("API request error:", apiError);
+          toast.error("Failed to connect to the server", {
             closeButton: true,
           });
           return false;

@@ -37,12 +37,14 @@ export default function ProfilePage() {
   // Check if we're in the browser environment
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const { user, isLoading, login, logout } = useAuth();
+  // Set up all hooks at the top level without conditions
+  const auth = useAuth();
+  const user = auth?.user;
+  const isLoading = auth?.isLoading ?? true;
+  const logout = auth?.logout;
   const router = useRouter();
+  const cookiePrefHook = useCookiePreferences();
+
   const [activeTab, setActiveTab] = useState("account");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,25 +63,32 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isGoogleAccount, setIsGoogleAccount] = useState(false);
-  const { cookiePreferences, updateCookiePreferences } = useCookiePreferences();
+  const [localCookiePreferences, setLocalCookiePreferences] = useState(
+    cookiePrefHook?.cookiePreferences || {
+      essential: true,
+      analytics: true,
+      preferences: true,
+      hasConsented: false,
+    }
+  );
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
-  // If not mounted yet (server-side), return a loading state or minimal content
-  if (!isMounted) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-pulse text-center">
-          <h1 className="text-2xl font-bold">Loading Profile...</h1>
-          <p className="text-muted-foreground mt-2">
-            Please wait while we load your profile information.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Safe client-side initialization
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Update local cookie preferences when cookiePreferences changes
+  useEffect(() => {
+    if (cookiePrefHook?.cookiePreferences) {
+      setLocalCookiePreferences(cookiePrefHook.cookiePreferences);
+    }
+  }, [cookiePrefHook?.cookiePreferences]);
 
   // Redirect if not logged in
   useEffect(() => {
+    if (!isMounted) return;
+
     if (!isLoading && !user) {
       router.push("/login");
     } else if (user) {
@@ -111,7 +120,7 @@ export default function ProfilePage() {
 
       checkGoogleAccount();
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, isMounted]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -148,9 +157,10 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Update user in context
-        login({
-          ...user,
+        // Update user in context - we can't use login directly as it's not in the auth context
+        // Instead, we'll rely on the next session update to refresh the user data
+        setProfileData({
+          ...profileData,
           name: profileData.name,
         });
 
@@ -297,7 +307,14 @@ export default function ProfilePage() {
   const handleSaveCookiePreferences = async () => {
     try {
       setIsSavingPreferences(true);
-      await updateCookiePreferences(cookiePreferences);
+      // Update with the local cookie preferences state
+      if (cookiePrefHook?.updateCookiePreferences) {
+        await cookiePrefHook.updateCookiePreferences({
+          analytics: localCookiePreferences.analytics,
+          preferences: localCookiePreferences.preferences,
+        });
+        toast.success("Cookie preferences saved successfully");
+      }
     } catch (error) {
       console.error("Error saving cookie preferences:", error);
       toast.error("Failed to save cookie preferences");
@@ -602,10 +619,14 @@ export default function ProfilePage() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="analytics"
-                    checked={cookiePreferences.analytics}
+                    checked={localCookiePreferences.analytics}
                     onCheckedChange={(checked) => {
                       if (typeof checked === "boolean") {
-                        updateCookiePreferences({ analytics: checked });
+                        // Update local state only, don't save yet
+                        setLocalCookiePreferences((prev) => ({
+                          ...prev,
+                          analytics: checked,
+                        }));
                       }
                     }}
                     disabled={isSavingPreferences}
@@ -620,10 +641,14 @@ export default function ProfilePage() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="preferences"
-                    checked={cookiePreferences.preferences}
+                    checked={localCookiePreferences.preferences}
                     onCheckedChange={(checked) => {
                       if (typeof checked === "boolean") {
-                        updateCookiePreferences({ preferences: checked });
+                        // Update local state only, don't save yet
+                        setLocalCookiePreferences((prev) => ({
+                          ...prev,
+                          preferences: checked,
+                        }));
                       }
                     }}
                     disabled={isSavingPreferences}

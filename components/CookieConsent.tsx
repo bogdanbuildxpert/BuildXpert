@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCookiePreferences } from "@/lib/hooks/use-cookie-preferences";
+import type { CookiePreferences } from "@/lib/hooks/use-cookie-preferences";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,27 +19,54 @@ import Link from "next/link";
 export function CookieConsent() {
   const { cookiePreferences, updateCookiePreferences, hasConsented } =
     useCookiePreferences();
-  const [isOpen, setIsOpen] = useState(!hasConsented);
+  // Initialize isOpen to false by default to prevent flashing
+  const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [localPreferences, setLocalPreferences] = useState(cookiePreferences);
+
+  // Effect to set initial state after checking consent status
+  useEffect(() => {
+    // Only show if user hasn't explicitly consented
+    if (!hasConsented && cookiePreferences?.hasConsented !== true) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [hasConsented, cookiePreferences]);
+
+  // Update local state when cookiePreferences changes
+  useEffect(() => {
+    setLocalPreferences(cookiePreferences);
+  }, [cookiePreferences]);
+
+  const handlePreferenceChange = (
+    key: keyof CookiePreferences,
+    value: boolean
+  ) => {
+    setLocalPreferences((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   const handleAcceptAll = async () => {
     setIsSaving(true);
-    await updateCookiePreferences({
+    const success = await updateCookiePreferences({
       analytics: true,
       preferences: true,
     });
     setIsSaving(false);
-    setIsOpen(false);
+    if (success) setIsOpen(false);
   };
 
   const handleCustomize = async () => {
     setIsSaving(true);
-    await updateCookiePreferences({
-      analytics: cookiePreferences.analytics,
-      preferences: cookiePreferences.preferences,
+    const success = await updateCookiePreferences({
+      analytics: localPreferences.analytics,
+      preferences: localPreferences.preferences,
     });
     setIsSaving(false);
-    setIsOpen(false);
+    if (success) setIsOpen(false);
   };
 
   if (!isOpen) return null;
@@ -70,9 +98,9 @@ export function CookieConsent() {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="analytics"
-              checked={cookiePreferences.analytics}
+              checked={localPreferences.analytics}
               onCheckedChange={(checked) =>
-                updateCookiePreferences({ analytics: checked as boolean })
+                handlePreferenceChange("analytics", checked as boolean)
               }
             />
             <div className="space-y-1">
@@ -85,9 +113,9 @@ export function CookieConsent() {
           <div className="flex items-center space-x-2">
             <Checkbox
               id="preferences"
-              checked={cookiePreferences.preferences}
+              checked={localPreferences.preferences}
               onCheckedChange={(checked) =>
-                updateCookiePreferences({ preferences: checked as boolean })
+                handlePreferenceChange("preferences", checked as boolean)
               }
             />
             <div className="space-y-1">

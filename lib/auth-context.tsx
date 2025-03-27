@@ -26,12 +26,21 @@ export interface AuthContextType {
   resetInactivityTimer: () => void;
 }
 
+// Create a default context value to avoid null checks
+const defaultContextValue: AuthContextType = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  logout: async () => {},
+  resetInactivityTimer: () => {},
+};
+
 // 5 hours in milliseconds
 const INACTIVITY_TIMEOUT = 5 * 60 * 60 * 1000;
 // Warning 5 minutes before logout
 const WARNING_BEFORE_TIMEOUT = 5 * 60 * 1000;
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>(defaultContextValue);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -45,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logoutRef = useRef<() => void>(() => {});
 
   // The logout function
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       console.log("Logging out user");
 
@@ -73,12 +82,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Even if there's an error, redirect to login
       window.location.href = `/login?from=error&t=${Date.now()}`;
     }
-  };
+  }, []);
 
   // Keep logout reference updated
   useEffect(() => {
     logoutRef.current = logout;
-  }, []);
+  }, [logout]);
 
   // Function to reset the inactivity timer using useCallback
   const resetInactivityTimer = useCallback(() => {
@@ -129,6 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Set up event listeners for user activity
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const activityEvents = ["mousedown", "keypress", "scroll", "touchstart"];
 
     const handleUserActivity = () => {
@@ -160,6 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sync session with local state
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     console.log("Session status:", status);
 
     if (status === "loading") {
@@ -213,25 +226,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, [session, status, resetInactivityTimer]);
 
+  const contextValue = {
+    user,
+    isAuthenticated,
+    isLoading,
+    logout,
+    resetInactivityTimer,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        isLoading,
-        logout,
-        resetInactivityTimer,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return useContext(AuthContext);
 }

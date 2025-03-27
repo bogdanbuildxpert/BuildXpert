@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { cookies } from "next/headers";
 
-// Set as dynamic to ensure it always runs on the server
-export const dynamic = "force-dynamic";
-
-// Mark this route as dynamic since it uses request parameters and cookies
+// Set as dynamic to ensure it always runs on the server and uses request parameters and cookies
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {

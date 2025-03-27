@@ -29,11 +29,7 @@ app
         const allowedOrigins =
           process.env.NODE_ENV === "production"
             ? [process.env.NEXT_PUBLIC_APP_URL || "https://buildxpert.ie"]
-            : [
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://127.0.0.1:3000",
-              ];
+            : ["http://localhost:3001", "http://127.0.0.1:3001"];
 
         const origin = req.headers.origin;
 
@@ -77,7 +73,7 @@ app
       }
 
       // Start the server
-      const PORT = process.env.PORT || 3000;
+      const PORT = process.env.PORT || 3001;
       server.listen(PORT, (err) => {
         if (err) throw err;
         console.log(`> Ready on http://localhost:${PORT}`);

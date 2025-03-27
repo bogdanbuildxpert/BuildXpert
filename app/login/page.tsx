@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { signIn, getSession } from "next-auth/react";
+import { signIn, getSession, signOut, useSession } from "next-auth/react";
 import { Separator } from "@/components/ui/separator";
 
 // Extract the inner content that uses useSearchParams
@@ -72,13 +72,8 @@ function LoginPageContent() {
     setIsLoading(true);
 
     try {
-      console.log("Starting login process with credentials:", {
-        email: loginData.email,
-        passwordLength: loginData.password.length,
-        redirect: redirectUrl,
-      });
+      console.log("Starting login process with credentials");
 
-      // First attempt to sign in with NextAuth
       const result = await signIn("credentials", {
         redirect: false,
         email: loginData.email,
@@ -88,75 +83,48 @@ function LoginPageContent() {
       console.log("Sign in result:", result);
 
       if (result?.error) {
-        throw new Error(result.error || "Failed to login");
+        throw new Error(result.error);
       }
 
       if (!result?.ok) {
         throw new Error("Login failed - please try again");
       }
 
-      // At this point, credentials are verified by NextAuth
-      console.log("Credentials verified, proceeding with direct login");
-
-      // Get user data directly from our debug endpoint which is more reliable
-      let userData = {
-        id: "temp-" + Date.now(), // We'll generate a temporary ID
-        email: loginData.email,
-        name: null,
-        role: "CLIENT",
-      };
-
-      try {
-        // Try to get user data from our debug endpoint
-        const debugResponse = await fetch("/api/auth/debug-login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: loginData.email,
-            password: loginData.password,
-          }),
-        });
-
-        const debugData = await debugResponse.json();
-
-        // If successful, use the user data from the debug endpoint
-        if (debugResponse.ok && debugData.user) {
-          userData = {
-            id: debugData.user.id,
-            email: debugData.user.email,
-            name: debugData.user.name,
-            role: debugData.user.role,
-          };
-          console.log("Got user data from debug endpoint:", userData);
-        } else {
-          console.warn("Debug login failed, using basic user data:", debugData);
-        }
-      } catch (error) {
-        console.error("Failed to get user data from debug endpoint:", error);
-        // Continue with basic user data
-      }
-
-      // Attempt direct login with the auth context
-      console.log("Attempting direct login with user data:", userData);
-      const loginResult = await auth.login(userData);
-
-      if (!loginResult) {
-        console.error("Auth context login failed, but we'll redirect anyway");
-      } else {
-        console.log("Auth context login succeeded");
-      }
-
+      // Simple success message
       toast.success("Login successful!");
 
-      // Delay the redirect slightly to allow the auth state to be fully set
-      setTimeout(() => {
-        router.push(redirectUrl);
-      }, 500);
+      // Use a client-side approach that works better with NextAuth
+      try {
+        // First update the session
+        await fetch("/api/auth/session", {
+          method: "GET",
+          credentials: "include", // Important to include credentials for cookies
+          headers: {
+            "Cache-Control": "no-cache, no-store, max-age=0",
+            Pragma: "no-cache",
+          },
+        });
+
+        console.log("Session refreshed");
+
+        // Longer timeout to ensure everything is established
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Now do a hard reload to the destination to ensure all
+        // cookies and state are properly established
+        const destination = result?.url || redirectUrl;
+        window.location.href = destination;
+      } catch (sessionError) {
+        console.error("Error refreshing session:", sessionError);
+        // Fallback to redirect anyway
+        window.location.href = redirectUrl;
+      }
     } catch (error) {
       console.error("Login error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to login");
+
+      // Clear any partial session state
+      await signOut({ redirect: false });
     } finally {
       setIsLoading(false);
     }

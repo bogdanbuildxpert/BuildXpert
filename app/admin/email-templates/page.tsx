@@ -48,7 +48,7 @@ type EmailTemplate = {
 };
 
 export default function EmailTemplatesPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,60 +63,47 @@ export default function EmailTemplatesPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  // Redirect if not admin
   useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        router.push("/login");
-      } else if (user.role !== "ADMIN" && user.role !== "admin") {
+    // If authentication is done loading and user is not admin, redirect
+    if (!isLoading && isAuthenticated) {
+      if (user?.role !== "ADMIN" && user?.role !== "admin") {
+        toast.error("You don't have permission to access this page");
         router.push("/");
+      } else {
+        fetchTemplates();
       }
+    } else if (!isLoading && !isAuthenticated) {
+      // If not authenticated and not loading, redirect to login
+      toast.error("Please login to access this page");
+      router.push("/login");
     }
-  }, [isLoading, user, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   // Fetch email templates
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-
-      // Get the user from localStorage for authentication
-      const storedUser = localStorage.getItem("user");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      // Add authorization if we have a user
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        headers["Authorization"] = `Bearer ${userData.id}`;
-      }
-
       const response = await fetch("/api/admin/email-templates", {
-        headers,
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important for cookies
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch email templates: ${response.status} ${response.statusText}`
-        );
+        throw new Error("Failed to fetch templates");
       }
 
       const data = await response.json();
-      setTemplates(data.templates);
+      setTemplates(data.templates || []);
     } catch (error) {
-      console.error("Error fetching email templates:", error);
-      toast.error("Failed to load email templates");
+      console.error("Error fetching templates:", error);
+      toast.error("Error loading email templates");
     } finally {
       setLoading(false);
     }
   };
-
-  // Initial fetch
-  useEffect(() => {
-    if (user && user.role === "ADMIN") {
-      fetchTemplates();
-    }
-  }, [user]);
 
   // Open edit dialog
   const openEditDialog = (template: EmailTemplate) => {
@@ -145,27 +132,18 @@ export default function EmailTemplatesPage() {
     try {
       setSaving(true);
 
-      // Get the user from localStorage for authentication
-      const storedUser = localStorage.getItem("user");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      // Add authorization if we have a user
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        headers["Authorization"] = `Bearer ${userData.id}`;
-      }
-
       const response = await fetch(
         `/api/admin/email-templates/${editedTemplate.id}`,
         {
           method: "PATCH",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             subject: editedTemplate.subject,
             content: editedTemplate.content,
           }),
+          credentials: "include", // Important for cookies
         }
       );
 
@@ -232,69 +210,34 @@ export default function EmailTemplatesPage() {
     );
   };
 
+  if (isLoading || loading) {
+    return <div className="container py-8">Loading email templates...</div>;
+  }
+
   return (
-    <div className="container mx-auto py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Email Templates</CardTitle>
-          <CardDescription>
-            Manage the email templates used for automated communications
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading templates...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Template Name</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.map((template) => (
-                  <TableRow key={template.id}>
-                    <TableCell className="font-medium">
-                      {formatTemplateName(template.name)}
-                    </TableCell>
-                    <TableCell>{template.subject}</TableCell>
-                    <TableCell>{template.description}</TableCell>
-                    <TableCell>
-                      {formatDistanceToNow(new Date(template.updatedAt), {
-                        addSuffix: true,
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openPreviewDialog(template)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Preview
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => openEditDialog(template)}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Email Templates</h1>
+
+      {templates.length === 0 ? (
+        <p>No email templates found.</p>
+      ) : (
+        <div className="grid gap-4">
+          {templates.map((template) => (
+            <div
+              key={template.id}
+              className="border p-4 rounded-lg cursor-pointer hover:bg-gray-50"
+              onClick={() =>
+                router.push(`/admin/email-templates/${template.id}`)
+              }
+            >
+              <h2 className="text-xl font-semibold">{template.name}</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Last updated: {new Date(template.updatedAt).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Edit Template Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

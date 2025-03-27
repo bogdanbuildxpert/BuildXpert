@@ -1,36 +1,67 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/db";
 import { cookies } from "next/headers";
+import { PrismaClient } from "@prisma/client";
 
 // Mark this route as dynamic since it uses cookies
 export const dynamic = "force-dynamic";
+
+// Create a Prisma client instance specifically for this route
+// This ensures we have a fresh connection for each request
+const prismaClient = new PrismaClient();
 
 // Helper function to check if user is admin
 function isAdmin(req: Request) {
   try {
     // Get the session cookie
     const cookieStore = cookies();
-    const userCookie = cookieStore.get("user");
 
-    if (!userCookie || !userCookie.value) {
-      // Check for Authorization header as fallback
-      const authHeader = req.headers.get("Authorization");
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.substring(7);
-        try {
-          const decodedToken = JSON.parse(atob(token.split(".")[1]));
-          return decodedToken.role === "ADMIN";
-        } catch (error) {
-          console.error("Error decoding token:", error);
-          return false;
-        }
+    // First check for NextAuth.js session token
+    const sessionToken = cookieStore.get("next-auth.session-token");
+    if (sessionToken && sessionToken.value) {
+      // Instead of trying to decode the JWT (which causes errors),
+      // check for the existence of the admin role cookie or header
+      const userRole = cookieStore.get("user-role");
+      if (userRole && userRole.value) {
+        return userRole.value === "ADMIN" || userRole.value === "admin";
       }
-      return false;
     }
 
-    // Parse the user cookie
-    const user = JSON.parse(userCookie.value);
-    return user && (user.role === "ADMIN" || user.role === "admin");
+    // Check for user cookie as fallback
+    const userCookie = cookieStore.get("user");
+    if (userCookie && userCookie.value) {
+      try {
+        const user = JSON.parse(userCookie.value);
+        return user && (user.role === "ADMIN" || user.role === "admin");
+      } catch (parseError) {
+        console.error("Error parsing user cookie:", parseError);
+      }
+    }
+
+    // Check for Authorization header as last resort
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      try {
+        // Safer token parsing - avoid atob which is causing the error
+        const base64Url = token.split(".")[1];
+        if (!base64Url) return false;
+
+        // Use safer base64 decoding with proper padding
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+        const jsonPayload = Buffer.from(base64 + padding, "base64").toString();
+
+        // Parse and check role
+        const decodedToken = JSON.parse(jsonPayload);
+        return decodedToken.role === "ADMIN" || decodedToken.role === "admin";
+      } catch (tokenError) {
+        console.error("Error safely decoding token:", tokenError);
+        return false;
+      }
+    }
+
+    return false;
   } catch (error) {
     console.error("Error checking admin status:", error);
     return false;
@@ -48,8 +79,8 @@ export async function GET(req: Request) {
       );
     }
 
-    // Get all email templates
-    const templates = await prisma.emailTemplate.findMany({
+    // Use the dedicated prisma client to ensure connection
+    const templates = await prismaClient.emailTemplate.findMany({
       orderBy: { name: "asc" },
     });
 
@@ -60,6 +91,9 @@ export async function GET(req: Request) {
       { error: "Failed to fetch email templates" },
       { status: 500 }
     );
+  } finally {
+    // Disconnect the client to prevent connection pool exhaustion
+    await prismaClient.$disconnect().catch(console.error);
   }
 }
 
@@ -84,8 +118,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update the email template
-    const updatedTemplate = await prisma.emailTemplate.update({
+    // Use the dedicated prisma client to ensure connection
+    const updatedTemplate = await prismaClient.emailTemplate.update({
       where: { id },
       data: {
         subject,
@@ -104,5 +138,8 @@ export async function POST(req: Request) {
       { error: "Failed to update email template" },
       { status: 500 }
     );
+  } finally {
+    // Disconnect the client to prevent connection pool exhaustion
+    await prismaClient.$disconnect().catch(console.error);
   }
 }

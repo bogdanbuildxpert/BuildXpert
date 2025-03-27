@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { cookies } from "next/headers";
+
+// Set as dynamic to ensure it always runs on the server
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   // Add cache control headers to prevent caching
@@ -66,13 +70,32 @@ export async function GET(request: NextRequest) {
     const isAuthenticated = !!token || !!cookieUser;
 
     if (isAuthenticated) {
+      // Extract user information
+      const userInfo = {
+        id: token?.id || token?.sub,
+        email: token?.email,
+        name: token?.name,
+        role: token?.role || "USER",
+      };
+
+      // Set a more accessible user-role cookie to help with admin checks
+      // This avoids having to decode the JWT token in different places
+      const cookieStore = cookies();
+      cookieStore.set("user-role", String(userInfo.role), {
+        httpOnly: false, // Allow JavaScript access
+        path: "/",
+        maxAge: 60 * 60 * 24, // 1 day
+        sameSite: "lax",
+        secure:
+          process.env.NODE_ENV === "production" ||
+          process.env.NEXTAUTH_URL?.startsWith("https"),
+      });
+
       return new NextResponse(
         JSON.stringify({
           authenticated: true,
           method: token ? "token" : "cookie",
-          user: token
-            ? { id: token.sub, email: token.email, role: token.role }
-            : cookieUser,
+          user: userInfo,
         }),
         {
           status: 200,

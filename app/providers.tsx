@@ -6,8 +6,9 @@ import { SessionProvider } from "next-auth/react";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider
-      refetchInterval={0} // Disable automatic refetching
-      refetchOnWindowFocus={false} // Disable refetch when window gains focus
+      refetchOnWindowFocus={false}
+      refetchWhenOffline={false}
+      refetchInterval={5 * 60}
     >
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         {children}

@@ -82,66 +82,69 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Check for user cookie as a fallback for authentication
-  const userCookie = request.cookies.get("user");
-  let cookieUser = null;
-
-  if (userCookie?.value) {
-    try {
-      cookieUser = JSON.parse(decodeURIComponent(userCookie.value));
-      console.log(`Found user cookie for ${path}:`, {
-        id: cookieUser.id,
-        role: cookieUser.role,
-        email: cookieUser.email,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error(`Failed to parse user cookie for ${path}:`, e);
-    }
-  } else {
-    console.log(
-      `No user cookie found for ${path}, timestamp: ${new Date().toISOString()}`
-    );
-  }
-
   // Get the NextAuth session token
   let token = null;
   try {
+    // More robust token extraction with specific cookie domain checking
     token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
+      secureCookie:
+        process.env.NODE_ENV === "production" ||
+        process.env.NEXTAUTH_URL?.startsWith("https"),
+      cookieName: "next-auth.session-token",
     });
 
-    if (token) {
+    // Only log token information for specific routes or when debugging
+    const isDebugRoute =
+      path.includes("/debug") || path.startsWith("/api/auth/");
+    if (token && isDebugRoute) {
       console.log(`Found NextAuth token for ${path}:`, {
         sub: token.sub,
         email: token.email,
         role: token.role || "not set",
       });
-    } else {
+    } else if (!token && isDebugRoute) {
       console.log(`No NextAuth token found for ${path}`);
+
+      // Fallback check for cookies manually only in debug routes
+      const cookieHeader = request.headers.get("cookie");
+      if (cookieHeader) {
+        if (cookieHeader.includes("next-auth.session-token")) {
+          console.log(
+            `Session token cookie exists but getToken returned null. Possible decoding issue.`
+          );
+        }
+      } else {
+        console.log(`No cookie header found in request`);
+      }
     }
   } catch (tokenError) {
     console.error(`Error retrieving NextAuth token for ${path}:`, tokenError);
   }
 
   let isAdmin = false;
-  let isAuthenticated = !!token || !!cookieUser;
+  let isAuthenticated = !!token;
 
   if (token) {
     // Check for both uppercase and lowercase admin roles
     isAdmin = token.role === "admin" || token.role === "ADMIN";
-  } else if (cookieUser) {
-    // Check for admin role in cookie user
-    isAdmin = cookieUser.role === "admin" || cookieUser.role === "ADMIN";
   }
 
-  console.log(`Auth status for ${path}:`, {
-    isAuthenticated,
-    isAdmin,
-    hasToken: !!token,
-    hasCookie: !!cookieUser,
-  });
+  // Only log auth status for specific routes to prevent log spam
+  const shouldLogAuthStatus =
+    path.startsWith("/admin") ||
+    path.startsWith("/api/auth") ||
+    path.includes("/debug") ||
+    path === "/login";
+
+  if (shouldLogAuthStatus) {
+    console.log(`Auth status for ${path}:`, {
+      isAuthenticated,
+      isAdmin,
+      hasToken: !!token,
+    });
+  }
 
   // If user is already authenticated and trying to access login/register pages,
   // redirect them to the dashboard instead

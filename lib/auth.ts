@@ -89,18 +89,37 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, trigger }) {
+      // When signing in, include user data in token
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.email = user.email;
+        token.name = user.name;
       }
+
+      // Handle session updates
+      if (trigger === "update") {
+        // If we're updating the session, make sure to refresh the token
+        console.log("JWT callback called due to update trigger");
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (token) {
+        // Ensure user data from token is included in the session
         session.user.id = token.id;
         session.user.role = token.role;
+        session.user.email = token.email || session.user.email;
+        session.user.name = token.name || session.user.name;
       }
+
+      // Add a timestamp to help with session revalidation
+      session.expires = new Date(
+        Date.now() + 24 * 60 * 60 * 1000
+      ).toISOString();
+
       return session;
     },
     async signIn({ user, account }) {
@@ -156,45 +175,69 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 30 * 60, // 30 minutes (more frequent updates for better security)
   },
   cookies: {
     sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? `__Secure-next-auth.session-token`
-          : `next-auth.session-token`,
+      name: `next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        // Only use secure cookies in production or if site URL uses https
+        secure:
+          process.env.NODE_ENV === "production" ||
+          process.env.NEXTAUTH_URL?.startsWith("https"),
       },
     },
     callbackUrl: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? `__Secure-next-auth.callback-url`
-          : `next-auth.callback-url`,
+      name: `next-auth.callback-url`,
       options: {
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        // Only use secure cookies in production or if site URL uses https
+        secure:
+          process.env.NODE_ENV === "production" ||
+          process.env.NEXTAUTH_URL?.startsWith("https"),
       },
     },
     csrfToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? `__Host-next-auth.csrf-token`
-          : `next-auth.csrf-token`,
+      name: `next-auth.csrf-token`,
       options: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        // Only use secure cookies in production or if site URL uses https
+        secure:
+          process.env.NODE_ENV === "production" ||
+          process.env.NEXTAUTH_URL?.startsWith("https"),
       },
     },
   },
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
   debug: process.env.NODE_ENV === "development",
   secret: process.env.NEXTAUTH_SECRET,
+  // Add this event listener to help debug token issues
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      console.log(`[NextAuth Event] User signed in: ${user.email}`);
+    },
+    async signOut({ token }) {
+      console.log(`[NextAuth Event] User signed out`);
+    },
+    async createUser({ user }) {
+      console.log(`[NextAuth Event] New user created: ${user.email}`);
+    },
+    async updateUser({ user }) {
+      console.log(`[NextAuth Event] User updated: ${user.email}`);
+    },
+    async linkAccount({ user, account, profile }) {
+      console.log(
+        `[NextAuth Event] Account linked: ${user.email} with ${account.provider}`
+      );
+    },
+  },
 };

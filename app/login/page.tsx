@@ -42,7 +42,7 @@ function LoginPageContent() {
   const [error, setError] = useState("");
 
   // Get the redirect URL from the query parameters
-  let redirectUrl = searchParams.get("callbackUrl") || "/dashboard";
+  let redirectUrl = searchParams.get("callbackUrl") || "/";
 
   // Handle the tab state
   const defaultTab =

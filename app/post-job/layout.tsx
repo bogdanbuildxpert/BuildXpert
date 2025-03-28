@@ -1,26 +1,53 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { JobFormProvider } from "@/lib/contexts/job-form-context";
 import Stepper from "@/components/Stepper";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+// We need to extend the AuthContextType for this component
+interface ExtendedAuth {
+  user: any;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+  resetInactivityTimer: () => void;
+  forceRefresh?: () => Promise<void>;
+  login?: (userData: any) => Promise<void>;
+}
+
 export default function PostJobLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, forceRefresh, login } = useAuth();
+  const auth = useAuth() as ExtendedAuth;
+  const { user, isLoading } = auth;
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
 
   // Auth handling moved here from individual pages
   useEffect(() => {
+    // Skip if we're already checking auth
+    if (isCheckingAuth) return;
+
+    setIsCheckingAuth(true);
+
     const checkAuth = async () => {
       try {
+        // Add timestamp for debugging
+        console.log(
+          `[${new Date().toISOString()}] Starting auth check for post-job page`
+        );
+
         // PRODUCTION FIX: Directly check cookies first before any other logic
         if (process.env.NODE_ENV === "production") {
+          console.log(
+            "Production environment detected, checking cookies directly"
+          );
+
           // Try to extract a user cookie directly from document.cookie (client-side only)
           const cookies = document.cookie.split(";");
           const userCookie = cookies.find((cookie) =>
@@ -39,9 +66,9 @@ export default function PostJobLayout({
                   email: cookieUser.email,
                 });
 
-                // Force update the auth context
-                if (!user && login) {
-                  await login(cookieUser);
+                // Force update the auth context if login is available
+                if (!user && auth.login) {
+                  await auth.login(cookieUser);
                   console.log("Forced login with cookie data");
                   return;
                 }
@@ -49,7 +76,15 @@ export default function PostJobLayout({
             } catch (e) {
               console.error("Failed to parse user cookie:", e);
             }
+          } else {
+            console.log("No user cookie found in document.cookie");
           }
+        }
+
+        // If we already have a user, we can skip the rest of the authentication checks
+        if (user) {
+          console.log("User already authenticated:", user.email);
+          return;
         }
 
         // Check for production environment and handle specially
@@ -57,6 +92,7 @@ export default function PostJobLayout({
           // Add a direct authentication check for post-job page
           const timestamp = Date.now();
           const authCheckUrl = `/api/auth/check?path=/post-job&t=${timestamp}`;
+          console.log(`Making auth check request to: ${authCheckUrl}`);
 
           try {
             const response = await fetch(authCheckUrl, {
@@ -68,6 +104,8 @@ export default function PostJobLayout({
               },
               credentials: "include",
             });
+
+            console.log(`Auth check response status: ${response.status}`);
 
             if (!response.ok) {
               console.log("Auth check failed, redirecting to login");
@@ -82,21 +120,24 @@ export default function PostJobLayout({
             console.log("Auth check passed, continuing to post-job page", data);
 
             // Additional check: if we got user data but no user in context, force login
-            if (data.authenticated && data.user && !user && login) {
-              await login(data.user);
+            if (data.authenticated && data.user && !user && auth.login) {
+              await auth.login(data.user);
               console.log("Forced login with API data");
               return;
             }
           } catch (error) {
             console.error("Error checking auth:", error);
-            // On error, continue with normal flow but log
+            // On error in production, redirect to login
+            const timestamp = Date.now();
+            window.location.href = `/login?redirect=/post-job&error=fetch&nocache=${timestamp}`;
+            return;
           }
         }
 
         // Only try to refresh if we're not already loading and don't have a user
-        if (!isLoading && !user && forceRefresh) {
+        if (!isLoading && !user && auth.forceRefresh) {
           console.log("No user detected, refreshing auth state...");
-          await forceRefresh();
+          await auth.forceRefresh();
 
           // After refresh, check if we have a user now
           if (!user) {
@@ -126,12 +167,14 @@ export default function PostJobLayout({
       } catch (error) {
         console.error("Error checking authentication:", error);
         toast.error("Authentication error. Please try logging in again.");
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
 
     // Run the auth check on component mount
     checkAuth();
-  }, [forceRefresh, isLoading, login, router, user]);
+  }, [auth, isLoading, router, user, isCheckingAuth]);
 
   if (isLoading) {
     return (

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatDistance } from "date-fns";
+import { VirtualizedJobList } from "@/components/VirtualizedJobList";
 
 interface Job {
   id: string;
@@ -78,11 +79,9 @@ export function ClientJobList({ userId }: ClientJobListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]); // Only re-run if userId changes
 
-  const handleDeleteJob = async () => {
-    if (!jobToDelete) return;
-
+  const handleDeleteJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/jobs/${jobToDelete}`, {
+      const response = await fetch(`/api/jobs/${jobId}`, {
         method: "DELETE",
       });
 
@@ -104,15 +103,13 @@ export function ClientJobList({ userId }: ClientJobListProps) {
       }
 
       // Remove the deleted job from the state
-      setJobs((prevJobs) => prevJobs.filter((job) => job.id !== jobToDelete));
+      setJobs((prevJobs) => prevJobs.filter((job) => job.id !== jobId));
       toast.success("Job deleted successfully");
     } catch (error) {
       console.error("Error deleting job:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to delete job"
       );
-    } finally {
-      setJobToDelete(null);
     }
   };
 
@@ -194,116 +191,11 @@ export function ClientJobList({ userId }: ClientJobListProps) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => (
-            <div
-              key={job.id}
-              className="flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden transition-all hover:shadow-md"
-            >
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-semibold text-lg">{job.title}</h3>
-                  <span
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${
-                      job.status === "PLANNING"
-                        ? "bg-green-100 text-green-800"
-                        : job.status === "IN_PROGRESS"
-                        ? "bg-blue-100 text-blue-800"
-                        : job.status === "ON_HOLD"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : job.status === "COMPLETED"
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {job.status === "PLANNING"
-                      ? "Planning"
-                      : job.status === "IN_PROGRESS"
-                      ? "In Progress"
-                      : job.status === "ON_HOLD"
-                      ? "On Hold"
-                      : job.status === "COMPLETED"
-                      ? "Completed"
-                      : "Cancelled"}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  {job.description}
-                </p>
-                <div className="space-y-2 mb-4">
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                    <span>{job.location}</span>
-                    <span>•</span>
-                    <span>
-                      Posted{" "}
-                      {formatDistance(new Date(job.createdAt), new Date(), {
-                        addSuffix: true,
-                      })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-between pt-4 border-t border-border">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="text-primary hover:text-primary hover:bg-primary/5"
-                  >
-                    <Link href={`/jobs/${job.id}`}>View Details</Link>
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      asChild
-                      className="hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                    >
-                      <Link href={`/jobs/edit/${job.id}`}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </Link>
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setJobToDelete(job.id)}
-                          className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Job</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this job posting?
-                            This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel
-                            onClick={() => setJobToDelete(null)}
-                          >
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleDeleteJob}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <VirtualizedJobList
+          jobs={filteredJobs}
+          onDeleteJob={handleDeleteJob}
+          userRole="CLIENT"
+        />
       )}
     </div>
   );

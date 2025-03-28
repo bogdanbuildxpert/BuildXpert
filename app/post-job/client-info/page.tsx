@@ -1,20 +1,112 @@
 "use client";
 
+import React, { useCallback, useMemo } from "react";
 import { useJobForm } from "@/lib/contexts/job-form-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "next-themes";
 
-export default function ClientInfoPage() {
+// Create a memoized form input component to avoid re-renders
+const MemoizedFormInput = React.memo(
+  ({
+    id,
+    label,
+    type,
+    placeholder,
+    value,
+    onChange,
+    required,
+    error,
+  }: {
+    id: string;
+    label: string;
+    type: string;
+    placeholder: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    required: boolean;
+    error?: string;
+  }) => {
+    const { theme } = useTheme();
+
+    return (
+      <div>
+        <Label htmlFor={id} className="dark:text-gray-200">
+          {label}
+          {required && (
+            <span className="text-red-500 dark:text-red-400 ml-1">*</span>
+          )}
+        </Label>
+        <Input
+          id={id}
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          className={
+            error
+              ? "border-red-500 dark:border-red-400"
+              : "dark:bg-gray-800 dark:border-gray-700"
+          }
+          required={required}
+        />
+        {error && (
+          <p className="text-red-500 dark:text-red-400 text-sm mt-1">{error}</p>
+        )}
+      </div>
+    );
+  }
+);
+
+MemoizedFormInput.displayName = "MemoizedFormInput";
+
+// Main component wrapped with React.memo
+function ClientInfoPage() {
   const { state, updateField, nextStep, errors, isFieldRequired } =
     useJobForm();
   const { formData } = state;
   const { theme } = useTheme();
 
-  const handleNext = () => {
+  // Memoize event handlers
+  const handleNext = useCallback(() => {
     nextStep();
-  };
+  }, [nextStep]);
+
+  const handleEmailChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateField("email", e.target.value);
+    },
+    [updateField]
+  );
+
+  const handlePhoneChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateField("phone", e.target.value);
+    },
+    [updateField]
+  );
+
+  const handleLocationChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateField("jobLocation", e.target.value);
+    },
+    [updateField]
+  );
+
+  // Memoize field requirement checks
+  const isEmailRequired = useMemo(
+    () => isFieldRequired("email"),
+    [isFieldRequired]
+  );
+  const isPhoneRequired = useMemo(
+    () => isFieldRequired("phone"),
+    [isFieldRequired]
+  );
+  const isLocationRequired = useMemo(
+    () => isFieldRequired("jobLocation"),
+    [isFieldRequired]
+  );
 
   return (
     <div className="space-y-6">
@@ -27,86 +119,38 @@ export default function ClientInfoPage() {
       </p>
 
       <div className="space-y-4">
-        <div>
-          <Label htmlFor="email" className="dark:text-gray-200">
-            Email
-            {isFieldRequired("email") && (
-              <span className="text-red-500 dark:text-red-400 ml-1">*</span>
-            )}
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="email@example.com"
-            value={formData.email}
-            onChange={(e) => updateField("email", e.target.value)}
-            className={
-              errors.email
-                ? "border-red-500 dark:border-red-400"
-                : "dark:bg-gray-800 dark:border-gray-700"
-            }
-            required={isFieldRequired("email")}
-          />
-          {errors.email && (
-            <p className="text-red-500 dark:text-red-400 text-sm mt-1">
-              {errors.email}
-            </p>
-          )}
-        </div>
+        <MemoizedFormInput
+          id="email"
+          label="Email"
+          type="email"
+          placeholder="email@example.com"
+          value={formData.email}
+          onChange={handleEmailChange}
+          required={isEmailRequired}
+          error={errors.email}
+        />
 
-        <div>
-          <Label htmlFor="phone" className="dark:text-gray-200">
-            Phone Number
-            {isFieldRequired("phone") && (
-              <span className="text-red-500 dark:text-red-400 ml-1">*</span>
-            )}
-          </Label>
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="(123) 456-7890"
-            value={formData.phone}
-            onChange={(e) => updateField("phone", e.target.value)}
-            className={
-              errors.phone
-                ? "border-red-500 dark:border-red-400"
-                : "dark:bg-gray-800 dark:border-gray-700"
-            }
-            required={isFieldRequired("phone")}
-          />
-          {errors.phone && (
-            <p className="text-red-500 dark:text-red-400 text-sm mt-1">
-              {errors.phone}
-            </p>
-          )}
-        </div>
+        <MemoizedFormInput
+          id="phone"
+          label="Phone Number"
+          type="tel"
+          placeholder="(123) 456-7890"
+          value={formData.phone}
+          onChange={handlePhoneChange}
+          required={isPhoneRequired}
+          error={errors.phone}
+        />
 
-        <div>
-          <Label htmlFor="jobLocation" className="dark:text-gray-200">
-            Job Location
-            {isFieldRequired("jobLocation") && (
-              <span className="text-red-500 dark:text-red-400 ml-1">*</span>
-            )}
-          </Label>
-          <Input
-            id="jobLocation"
-            type="text"
-            placeholder="Address or area where the job will be performed"
-            value={formData.jobLocation}
-            onChange={(e) => updateField("jobLocation", e.target.value)}
-            className={
-              errors.jobLocation
-                ? "border-red-500 dark:border-red-400"
-                : "dark:bg-gray-800 dark:border-gray-700"
-            }
-            required={isFieldRequired("jobLocation")}
-          />
-          {errors.jobLocation && (
-            <p className="text-red-500 dark:text-red-400 text-sm mt-1">
-              {errors.jobLocation}
-            </p>
-          )}
-        </div>
+        <MemoizedFormInput
+          id="jobLocation"
+          label="Job Location"
+          type="text"
+          placeholder="Address or area where the job will be performed"
+          value={formData.jobLocation}
+          onChange={handleLocationChange}
+          required={isLocationRequired}
+          error={errors.jobLocation}
+        />
       </div>
 
       <div className="pt-4 flex justify-end">
@@ -115,3 +159,6 @@ export default function ClientInfoPage() {
     </div>
   );
 }
+
+// Export the memoized component
+export default React.memo(ClientInfoPage);

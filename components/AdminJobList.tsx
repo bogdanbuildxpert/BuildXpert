@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatDistance } from "date-fns";
 import { toast } from "sonner";
+import { VirtualizedJobList } from "@/components/VirtualizedJobList";
 
 interface Job {
   id: string;
@@ -238,176 +239,11 @@ export function AdminJobList() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => (
-            <div
-              key={job.id}
-              className="group flex flex-col h-full bg-background border border-border rounded-lg overflow-hidden transition-all hover:shadow-md hover:border-primary/50"
-            >
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-2">
-                    {job.title}
-                  </h3>
-                  <span
-                    className={`text-xs font-medium px-3 py-1 rounded-full ${
-                      job.status === "PLANNING"
-                        ? "bg-green-100 text-green-800"
-                        : job.status === "IN_PROGRESS"
-                        ? "bg-blue-100 text-blue-800"
-                        : job.status === "ON_HOLD"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : job.status === "COMPLETED"
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {job.status === "PLANNING"
-                      ? "Planning"
-                      : job.status === "IN_PROGRESS"
-                      ? "In Progress"
-                      : job.status === "ON_HOLD"
-                      ? "On Hold"
-                      : job.status === "COMPLETED"
-                      ? "Completed"
-                      : "Cancelled"}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  {job.description}
-                </p>
-                <div className="mt-auto pt-3 border-t border-border">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4 text-primary"
-                    >
-                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                      <span>{job.location}</span>
-                      <span>•</span>
-                      <span>
-                        Posted{" "}
-                        {formatDistance(new Date(job.createdAt), new Date(), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4 text-primary"
-                      >
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                      <span>{formatDate(job.createdAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4 text-primary"
-                      >
-                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                      <span className="truncate max-w-[120px]">
-                        {job.poster.name || job.poster.email.split("@")[0]}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="mt-4 flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 rounded-full"
-                    asChild
-                  >
-                    <Link href={`/jobs/${job.id}`}>
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">View</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 rounded-full"
-                    asChild
-                  >
-                    <Link href={`/jobs/edit/${job.id}`}>
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Edit</span>
-                    </Link>
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2 rounded-full text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Job</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete this job? This action
-                          cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteJob(job.id)}
-                          disabled={isDeleting && jobToDelete === job.id}
-                          className="bg-destructive hover:bg-destructive/90"
-                        >
-                          {isDeleting && jobToDelete === job.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <VirtualizedJobList
+          jobs={filteredJobs}
+          onDeleteJob={handleDeleteJob}
+          userRole="ADMIN"
+        />
       )}
     </div>
   );

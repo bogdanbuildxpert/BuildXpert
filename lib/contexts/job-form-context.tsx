@@ -6,6 +6,8 @@ import React, {
   useReducer,
   useEffect,
   useState,
+  useCallback,
+  useMemo,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -248,7 +250,7 @@ export function JobFormProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem("jobFormData", JSON.stringify(state.formData));
     } catch (error) {
-      console.error("Error saving form data:", error);
+      console.error("Error saving data:", error);
     }
   }, [state.formData]);
 
@@ -260,185 +262,205 @@ export function JobFormProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, state.currentStep]);
 
-  // Check if all required fields for a step are filled
-  const areRequiredFieldsFilled = (step: JobFormStep): boolean => {
-    const fields = requiredFields[step];
-
-    for (const field of fields) {
-      const value = state.formData[field];
-
-      // Check empty values
-      if (value === undefined || value === null || value === "") {
-        return false;
-      }
-
-      // Check empty arrays
-      if (Array.isArray(value) && value.length === 0) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
-  // Context functions
-  const updateField = (field: keyof JobFormData, value: any) => {
-    dispatch({ type: "UPDATE_FIELD", field, value });
-
-    // Clear error for this field if exists
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
+  // Memoize this function to avoid recreating it on every render
+  const areRequiredFieldsFilled = useCallback(
+    (step: JobFormStep): boolean => {
+      const fieldsForStep = requiredFields[step];
+      return fieldsForStep.every((field) => {
+        const value = state.formData[field];
+        if (Array.isArray(value)) {
+          return value.length > 0;
+        }
+        return !!value;
       });
-    }
-  };
+    },
+    [state.formData]
+  );
 
-  const setStep = (step: JobFormStep) => {
-    // First check if user can navigate to this step
-    // They can only navigate to steps they've completed or the next available step
-    const canNavigate =
-      step <= state.currentStep ||
-      isStepCompleted(step - 1) ||
-      step === Math.max(...Array.from(state.completedSteps)) + 1 ||
-      step === 0;
+  // Memoize this function to avoid recreating it on every render
+  const updateField = useCallback(
+    (field: keyof JobFormData, value: any) => {
+      dispatch({ type: "UPDATE_FIELD", field, value });
 
-    if (canNavigate) {
+      // Clear error for this field when it's updated
+      if (errors[field]) {
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
+      }
+    },
+    [errors]
+  );
+
+  // Memoize this function to avoid recreating it on every render
+  const setStep = useCallback(
+    (step: JobFormStep) => {
       dispatch({ type: "SET_STEP", step });
-      router.push(stepPaths[step]);
-    } else {
-      toast.error("Please complete the previous steps first");
-    }
-  };
 
-  const nextStep = () => {
+      // Navigate to the corresponding path
+      const targetPath = stepPaths[step];
+      if (pathname !== targetPath) {
+        try {
+          router.push(targetPath);
+        } catch (error) {
+          console.error("Navigation error:", error);
+          window.location.href = targetPath;
+        }
+      }
+    },
+    [pathname, router]
+  );
+
+  // Validation function needs to be defined before it's used in nextStep
+  const validateStep = useCallback(
+    (step: JobFormStep): boolean => {
+      const newErrors: ValidationErrors = {};
+      let isValid = true;
+
+      // Validation for Client Info step
+      if (step === JobFormStep.ClientInfo) {
+        if (!state.formData.email) {
+          newErrors.email = "Email is required";
+          isValid = false;
+        } else if (!/\S+@\S+\.\S+/.test(state.formData.email)) {
+          newErrors.email = "Email is invalid";
+          isValid = false;
+        }
+
+        if (!state.formData.phone) {
+          newErrors.phone = "Phone number is required";
+          isValid = false;
+        }
+      }
+
+      // Validation for Job Details step
+      else if (step === JobFormStep.JobDetails) {
+        if (!state.formData.jobLocation) {
+          newErrors.jobLocation = "Job location is required";
+          isValid = false;
+        }
+
+        if (state.formData.paintingAreas.length === 0) {
+          newErrors.paintingAreas = "Select at least one area to be painted";
+          isValid = false;
+        }
+
+        if (!state.formData.surfaceCondition) {
+          newErrors.surfaceCondition = "Surface condition is required";
+          isValid = false;
+        }
+      }
+
+      // Validation for Painting Preferences step
+      else if (step === JobFormStep.PaintingPreferences) {
+        if (!state.formData.paintType) {
+          newErrors.paintType = "Paint type is required";
+          isValid = false;
+        }
+      }
+
+      // Validation for Project Scope step
+      else if (step === JobFormStep.ProjectScope) {
+        if (!state.formData.startDate) {
+          newErrors.startDate = "Start date is required";
+          isValid = false;
+        }
+
+        if (
+          state.formData.estimatedArea &&
+          isNaN(Number(state.formData.estimatedArea))
+        ) {
+          newErrors.estimatedArea = "Estimated area must be a number";
+          isValid = false;
+        }
+
+        if (
+          state.formData.startDate &&
+          state.formData.endDate &&
+          state.formData.startDate > state.formData.endDate
+        ) {
+          newErrors.endDate = "End date must be after start date";
+          isValid = false;
+        }
+      }
+
+      if (!isValid) {
+        toast.error("Please fill in all required fields");
+      }
+
+      setErrors(newErrors);
+      return isValid;
+    },
+    [state.formData]
+  );
+
+  // Memoize these functions to avoid recreating them on every render
+  const nextStep = useCallback(() => {
     if (validateStep(state.currentStep)) {
-      dispatch({ type: "SET_COMPLETED_STEP", step: state.currentStep });
       dispatch({ type: "NEXT_STEP" });
       router.push(stepPaths[(state.currentStep + 1) as JobFormStep]);
     }
-  };
+  }, [state.currentStep, router, validateStep]);
 
-  const prevStep = () => {
+  const prevStep = useCallback(() => {
     dispatch({ type: "PREV_STEP" });
     router.push(stepPaths[(state.currentStep - 1) as JobFormStep]);
-  };
+  }, [state.currentStep, router]);
 
-  const validateStep = (step: JobFormStep): boolean => {
-    const newErrors: ValidationErrors = {};
-    let isValid = true;
-
-    // Validation for Client Info step
-    if (step === JobFormStep.ClientInfo) {
-      if (!state.formData.email) {
-        newErrors.email = "Email is required";
-        isValid = false;
-      } else if (!/\S+@\S+\.\S+/.test(state.formData.email)) {
-        newErrors.email = "Email is invalid";
-        isValid = false;
-      }
-
-      if (!state.formData.phone) {
-        newErrors.phone = "Phone number is required";
-        isValid = false;
-      }
-    }
-
-    // Validation for Job Details step
-    else if (step === JobFormStep.JobDetails) {
-      if (!state.formData.jobLocation) {
-        newErrors.jobLocation = "Job location is required";
-        isValid = false;
-      }
-
-      if (state.formData.paintingAreas.length === 0) {
-        newErrors.paintingAreas = "Select at least one area to be painted";
-        isValid = false;
-      }
-
-      if (!state.formData.surfaceCondition) {
-        newErrors.surfaceCondition = "Surface condition is required";
-        isValid = false;
-      }
-    }
-
-    // Validation for Painting Preferences step
-    else if (step === JobFormStep.PaintingPreferences) {
-      if (!state.formData.paintType) {
-        newErrors.paintType = "Paint type is required";
-        isValid = false;
-      }
-    }
-
-    // Validation for Project Scope step
-    else if (step === JobFormStep.ProjectScope) {
-      if (!state.formData.startDate) {
-        newErrors.startDate = "Start date is required";
-        isValid = false;
-      }
-
-      if (
-        state.formData.estimatedArea &&
-        isNaN(Number(state.formData.estimatedArea))
-      ) {
-        newErrors.estimatedArea = "Estimated area must be a number";
-        isValid = false;
-      }
-
-      if (
-        state.formData.startDate &&
-        state.formData.endDate &&
-        state.formData.startDate > state.formData.endDate
-      ) {
-        newErrors.endDate = "End date must be after start date";
-        isValid = false;
-      }
-    }
-
-    if (!isValid) {
-      toast.error("Please fill in all required fields");
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     dispatch({ type: "RESET_FORM" });
-    setErrors({});
     localStorage.removeItem("jobFormData");
-  };
+  }, []);
 
-  const loadSavedData = (data: JobFormData) => {
+  const loadSavedData = useCallback((data: JobFormData) => {
     dispatch({ type: "LOAD_SAVED_DATA", data });
-  };
+  }, []);
 
-  const isStepCompleted = (step: JobFormStep): boolean => {
-    return state.completedSteps.has(step);
-  };
+  const isStepCompleted = useCallback(
+    (step: JobFormStep): boolean => {
+      return state.completedSteps.has(step);
+    },
+    [state.completedSteps]
+  );
 
-  const isFieldRequired = (field: keyof JobFormData): boolean => {
+  const isFieldRequired = useCallback((field: keyof JobFormData): boolean => {
     return Object.values(requiredFields).some((fields) =>
       fields.includes(field)
     );
-  };
+  }, []);
 
-  // Provide context value
-  const contextValue: JobFormContextProps = {
-    state,
-    updateField,
-    setStep,
-    nextStep,
-    prevStep,
-    validateStep,
-    resetForm,
-    loadSavedData,
-    isStepCompleted,
-    errors,
-    setErrors,
-    isFieldRequired,
-  };
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(
+    () => ({
+      state,
+      updateField,
+      setStep,
+      nextStep,
+      prevStep,
+      validateStep,
+      resetForm,
+      loadSavedData,
+      isStepCompleted,
+      errors,
+      setErrors,
+      isFieldRequired,
+    }),
+    [
+      state,
+      updateField,
+      setStep,
+      nextStep,
+      prevStep,
+      validateStep,
+      resetForm,
+      loadSavedData,
+      isStepCompleted,
+      errors,
+      isFieldRequired,
+    ]
+  );
 
   return (
     <JobFormContext.Provider value={contextValue}>

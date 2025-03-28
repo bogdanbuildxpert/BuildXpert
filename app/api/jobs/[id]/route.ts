@@ -47,11 +47,27 @@ export async function PUT(
     const user = await getUserFromRequest(request);
 
     if (!user) {
+      console.error("Authentication failed for job update. Request details:", {
+        url: request.url,
+        method: request.method,
+        headers: Object.fromEntries(request.headers.entries()),
+        cookies: request.cookies
+          .getAll()
+          .map((c) => `${c.name}=${c.value.substring(0, 10)}...`),
+      });
+
       return NextResponse.json(
-        { error: "Authentication required" },
+        {
+          error: "Authentication required",
+          message: "Your session may have expired. Please log out and back in.",
+        },
         { status: 401 }
       );
     }
+
+    console.log(
+      `Job update request from user: ${user.id} (${user.email}), role: ${user.role}`
+    );
 
     const body = await request.json();
     const { title, description, location, status, metadata } = body;
@@ -174,11 +190,30 @@ export async function DELETE(
     const user = await getUserFromRequest(request);
 
     if (!user) {
+      console.error(
+        "Authentication failed for job deletion. Request details:",
+        {
+          url: request.url,
+          method: request.method,
+          headers: Object.fromEntries(request.headers.entries()),
+          cookies: request.cookies
+            .getAll()
+            .map((c) => `${c.name}=${c.value.substring(0, 10)}...`),
+        }
+      );
+
       return NextResponse.json(
-        { error: "Authentication required" },
+        {
+          error: "Authentication required",
+          message: "Your session may have expired. Please log out and back in.",
+        },
         { status: 401 }
       );
     }
+
+    console.log(
+      `Job deletion request from user: ${user.id} (${user.email}), role: ${user.role}`
+    );
 
     // Check if job exists and get the poster information
     const existingJob = await prisma.job.findUnique({

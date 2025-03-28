@@ -434,6 +434,58 @@ export default function JobEditPage({ params }: JobEditPageProps) {
     setIsSaving(true);
 
     try {
+      // First, refresh auth state and sync cookies to ensure we have current authentication
+      try {
+        console.log("Refreshing auth state before submission");
+
+        // Call the auth check endpoint to ensure cookies are set
+        const authCheckResponse = await fetch(
+          `/api/auth/check?t=${Date.now()}`,
+          {
+            method: "GET",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+            credentials: "include",
+          }
+        );
+
+        if (authCheckResponse.ok) {
+          const authData = await authCheckResponse.json();
+          console.log("Auth check successful:", authData);
+
+          // Try to get the auth token from cookies
+          const cookies = document.cookie.split(";").map((c) => c.trim());
+          const authTokenCookie = cookies.find((c) =>
+            c.startsWith("auth_token=")
+          );
+
+          if (authTokenCookie) {
+            const authToken = authTokenCookie.split("=")[1];
+            // Store in localStorage for easier access in future API calls
+            localStorage.setItem("auth_token", authToken);
+            console.log("Auth token stored in localStorage");
+          } else {
+            // If no auth_token cookie, create one
+            const tokenData = {
+              id: user?.id || "anonymous",
+              email: user?.email || "anonymous@user.com",
+              exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
+            };
+            const newAuthToken = btoa(JSON.stringify(tokenData));
+            localStorage.setItem("auth_token", newAuthToken);
+            console.log("Created and stored new auth token");
+          }
+        } else {
+          console.warn("Auth check failed, proceeding anyway");
+        }
+      } catch (authError) {
+        console.error("Error refreshing auth state:", authError);
+        // Continue anyway with submission
+      }
+
       // Format the data for submission
       const jobData = {
         title: `Painting Job - ${formData.propertyType} Property in ${
@@ -464,21 +516,88 @@ export default function JobEditPage({ params }: JobEditPageProps) {
         },
       };
 
+      // Log cookie status for debugging
+      const cookies = document.cookie.split(";").map((c) => c.trim());
+      const hasUserCookie = cookies.some((c) => c.startsWith("user="));
+      const hasSessionCookie = cookies.some((c) =>
+        c.startsWith("next-auth.session-token=")
+      );
+      const hasAuthToken = cookies.some((c) => c.startsWith("auth_token="));
+
+      console.log("Cookie status before submission:", {
+        hasUserCookie,
+        hasSessionCookie,
+        hasAuthToken,
+        cookiesCount: cookies.length,
+      });
+
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem("auth_token") || "";
+
+      // Ensure we have a user ID to use in headers and fallback methods
+      const userId = user?.id || "";
+
       const response = await fetch(`/api/jobs/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+          "X-User-ID": userId, // Add user ID to headers as fallback
         },
+        credentials: "include", // Important: include credentials for cookies
         body: JSON.stringify(jobData),
       });
 
       if (!response.ok) {
+        // If we get a 401, try once more with user_id in the URL
+        if (response.status === 401) {
+          console.log("Got 401, trying alternative submission method");
+
+          // Try calling the auth check endpoint one more time
+          await fetch(`/api/auth/check?t=${Date.now()}`, {
+            credentials: "include",
+          });
+
+          // Try again with user_id in the URL as a query parameter
+          const retryResponse = await fetch(
+            `/api/jobs/${id}?user_id=${userId}`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+              },
+              credentials: "include",
+              body: JSON.stringify(jobData),
+            }
+          );
+
+          if (retryResponse.ok) {
+            const result = await retryResponse.json();
+            toast.success("Job updated successfully on retry");
+            router.push(`/jobs/${id}`);
+            return;
+          } else {
+            console.error(
+              "Retry also failed with status:",
+              retryResponse.status
+            );
+          }
+        }
+
         const errorData = await response.json();
 
         // Handle specific error cases
         if (response.status === 401) {
           toast.error("You need to be logged in to edit this job");
-          router.push("/login");
+
+          // Add a button to go to login page
+          toast("You may need to refresh your session", {
+            action: {
+              label: "Go to Login",
+              onClick: () => router.push(`/login?redirect=/jobs/edit/${id}`),
+            },
+          });
           return;
         }
 

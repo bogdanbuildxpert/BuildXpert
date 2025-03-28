@@ -9,12 +9,14 @@ import {
 } from "@/lib/contexts/job-form-context";
 import { cn } from "@/lib/utils";
 import { CheckIcon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function Stepper() {
   const pathname = usePathname();
   const { state, setStep, isStepCompleted } = useJobForm();
   const { currentStep } = state;
   const containerRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
 
   const steps = [
     { id: JobFormStep.ClientInfo, label: "Client Info" },
@@ -54,12 +56,12 @@ export default function Stepper() {
         {/* Progress track container - positioned to align with circles */}
         <div className="absolute inset-x-0" style={{ top: "20px" }}>
           {/* Background track - gray line across all steps */}
-          <div className="w-full h-0.5 bg-gray-200 absolute"></div>
+          <div className="w-full h-0.5 bg-gray-200 dark:bg-gray-700 absolute"></div>
 
           {/* Active progress track - green progress bar */}
           {currentStep > 0 && (
             <div
-              className="h-0.5 bg-green-500 absolute left-0 transition-all duration-500 ease-in-out"
+              className="h-0.5 bg-green-500 dark:bg-green-400 absolute left-0 transition-all duration-500 ease-in-out"
               style={{ width: calculateProgressWidth() }}
             ></div>
           )}
@@ -70,12 +72,12 @@ export default function Stepper() {
           <div key={step.id} className="flex flex-col items-center z-10">
             <div
               className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-200 bg-white",
+                "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-200 bg-white dark:bg-gray-900",
                 isStepCompleted(step.id)
-                  ? "border-green-500 bg-green-500 text-white"
+                  ? "border-green-500 bg-green-500 dark:border-green-400 dark:bg-green-400 text-white"
                   : step.id === currentStep
                   ? "border-primary bg-primary text-white"
-                  : "border-gray-300 text-gray-400 cursor-not-allowed"
+                  : "border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
               )}
               onClick={() => handleStepClick(step.id)}
               role="button"
@@ -87,7 +89,7 @@ export default function Stepper() {
                 <span className="text-sm font-semibold">{index + 1}</span>
               )}
             </div>
-            <div className="text-xs mt-2 max-w-[80px] text-center">
+            <div className="text-xs mt-2 max-w-[80px] text-center dark:text-gray-300 hidden md:block">
               {step.label}
             </div>
           </div>

@@ -6,6 +6,7 @@ import Stepper from "@/components/Stepper";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 
 // We need to extend the AuthContextType for this component
 interface ExtendedAuth {
@@ -27,6 +28,7 @@ export default function PostJobLayout({
   const { user, isLoading } = auth;
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const { theme } = useTheme();
 
   // Auth handling moved here from individual pages
   useEffect(() => {
@@ -194,7 +196,7 @@ export default function PostJobLayout({
       <div className="container mx-auto p-4 max-w-4xl mt-6">
         <h1 className="text-2xl font-bold mb-6">Post a Painting Job</h1>
         <Stepper />
-        <div className="mt-8 border border-border rounded-lg p-6 shadow-sm bg-white">
+        <div className="mt-8 border border-border rounded-lg p-6 shadow-sm dark:shadow-md bg-white dark:bg-gray-900 dark:border-gray-700">
           {children}
         </div>
       </div>

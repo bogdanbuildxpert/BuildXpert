@@ -37,7 +37,7 @@ export function Navigation() {
   const isAdmin = user?.role === "ADMIN";
 
   return (
-    <header className="border-b border-border">
+    <header className="shadow-border relative">
       <div className="container py-4">
         <nav className="flex items-center justify-between">
           <Link href="/" className="text-xl font-bold">

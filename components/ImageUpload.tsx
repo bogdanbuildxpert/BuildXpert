@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { ImageIcon, X, AlertCircle } from "lucide-react";
+import { ImageIcon, X, AlertCircle, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   compressImage,
@@ -34,6 +34,9 @@ export default function ImageUpload({
     [key: string]: boolean;
   }>({});
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deletingImages, setDeletingImages] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   const uploadToSupabase = useCallback(
     async (file: File) => {
@@ -185,6 +188,57 @@ export default function ImageUpload({
     [existingImages, maxImages, uploadToSupabase]
   );
 
+  // Function to delete image from Supabase storage
+  const deleteImageFromStorage = useCallback(
+    async (imageUrl: string) => {
+      // Set the deleting state for this image
+      setDeletingImages((prev) => ({
+        ...prev,
+        [imageUrl]: true,
+      }));
+
+      try {
+        // Call the API to delete the image from storage
+        const response = await fetch("/api/delete-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ imageUrl }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `Delete failed with status ${response.status}`
+          );
+        }
+
+        // If successful, remove from component state through callback
+        onRemoveImage(imageUrl);
+        console.log(`Successfully deleted image from storage: ${imageUrl}`);
+      } catch (error) {
+        console.error("Error deleting image from storage:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Delete failed";
+
+        // Still remove from UI but show error
+        onRemoveImage(imageUrl);
+        toast.error(
+          `Image removed from form but may not be deleted from storage: ${errorMessage}`
+        );
+      } finally {
+        // Clear deleting state for this image
+        setDeletingImages((prev) => {
+          const updated = { ...prev };
+          delete updated[imageUrl];
+          return updated;
+        });
+      }
+    },
+    [onRemoveImage]
+  );
+
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="grid grid-cols-3 gap-2">
@@ -201,11 +255,16 @@ export default function ImageUpload({
             />
             <button
               type="button"
-              onClick={() => onRemoveImage(imageUrl)}
+              onClick={() => deleteImageFromStorage(imageUrl)}
               className="absolute top-1 right-1 bg-black/70 hover:bg-black p-1 rounded-full"
               aria-label="Remove image"
+              disabled={deletingImages[imageUrl]}
             >
-              <X className="h-4 w-4 text-white" />
+              {deletingImages[imageUrl] ? (
+                <Loader2 className="h-4 w-4 text-white animate-spin" />
+              ) : (
+                <X className="h-4 w-4 text-white" />
+              )}
             </button>
           </div>
         ))}

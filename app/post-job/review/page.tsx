@@ -11,13 +11,25 @@ import { getCsrfToken } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
+// Extended interface for auth context that includes forceRefresh
+interface ExtendedAuth {
+  user: any;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+  resetInactivityTimer: () => void;
+  forceRefresh?: () => Promise<void>;
+  login?: (userData: any) => Promise<void>;
+}
+
 export default function ReviewPage() {
   const { state, updateField, prevStep, resetForm, setStep, validateStep } =
     useJobForm();
   const { formData } = state;
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { user, forceRefresh } = useAuth();
+  const auth = useAuth() as ExtendedAuth;
+  const { user, forceRefresh } = auth;
   const csrfTokenRef = useRef<string | null>(null);
 
   // Navigate to specific step for editing
@@ -55,6 +67,7 @@ Additional Notes: ${formData.additionalNotes}
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
+      console.log("Starting job submission process");
 
       // Validate all steps before submission
       for (let step = 0; step < 5; step++) {
@@ -65,6 +78,16 @@ Additional Notes: ${formData.additionalNotes}
           return;
         }
       }
+
+      // Check if we have a user
+      if (!user || !user.id) {
+        console.error("No authenticated user found for job submission");
+        toast.error("Authentication error. Please try logging in again.");
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("User authenticated for job submission:", user.email);
 
       // Prepare the metadata object first with correct types
       const metadata: any = {
@@ -104,6 +127,7 @@ Additional Notes: ${formData.additionalNotes}
         try {
           const token = await getCsrfToken();
           csrfTokenRef.current = token || null;
+          console.log("Obtained CSRF token for submission");
         } catch (error) {
           console.error("Failed to get CSRF token:", error);
         }
@@ -111,8 +135,23 @@ Additional Notes: ${formData.additionalNotes}
 
       // Force a refresh of the auth state before submitting
       if (forceRefresh) {
+        console.log("Refreshing auth state before submission");
         await forceRefresh();
       }
+
+      console.log("Submitting job data to API");
+
+      // Get the current cookie for debugging
+      const cookies = document.cookie.split(";").map((c) => c.trim());
+      const hasUserCookie = cookies.some((c) => c.startsWith("user="));
+      const hasSessionCookie = cookies.some((c) =>
+        c.startsWith("next-auth.session-token=")
+      );
+      console.log("Cookie status before submission:", {
+        hasUserCookie,
+        hasSessionCookie,
+        cookiesCount: cookies.length,
+      });
 
       const response = await fetch("/api/jobs", {
         method: "POST",
@@ -121,17 +160,27 @@ Additional Notes: ${formData.additionalNotes}
           ...(csrfTokenRef.current && {
             "csrf-token": csrfTokenRef.current,
           }),
+          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
         },
+        credentials: "include", // Important: include credentials for cookies
         body: JSON.stringify(jobData),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to create job");
+        const responseText = await response.text();
+        let error;
+        try {
+          error = JSON.parse(responseText);
+        } catch (e) {
+          error = { message: responseText || "Unknown error occurred" };
+        }
+        throw new Error(error.message || error.error || "Failed to create job");
       }
 
       const result = await response.json();
       toast.success("Job posted successfully!");
+
+      console.log("Job created successfully:", result.id);
 
       // Reset the form data after successful submission
       resetForm();
@@ -140,7 +189,27 @@ Additional Notes: ${formData.additionalNotes}
       router.push(`/jobs/${result.id}`);
     } catch (error: any) {
       console.error("Error submitting job:", error);
-      toast.error(error.message || "Failed to submit job. Please try again.");
+
+      // Check for authentication errors and provide specific guidance
+      if (
+        error.message?.includes("Unauthorized") ||
+        error.message?.includes("401")
+      ) {
+        toast.error(
+          "Authentication error. Please try logging out and logging back in."
+        );
+
+        // Add a button to go to login page
+        toast("You may need to refresh your session", {
+          action: {
+            label: "Go to Login",
+            onClick: () => router.push("/login?redirect=/post-job/review"),
+          },
+        });
+      } else {
+        // Generic error message for other types of errors
+        toast.error(error.message || "Failed to submit job. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

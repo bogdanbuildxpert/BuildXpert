@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
 // POST a new job
 export async function POST(request: NextRequest) {
   try {
+    console.log("POST /api/jobs: Starting job creation");
+
     // Add proper caching headers
     const headers = new Headers({
       "Cache-Control": "no-store, must-revalidate",
@@ -77,43 +79,80 @@ export async function POST(request: NextRequest) {
     let authMethod = null;
 
     // First try to get the token from NextAuth
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-
-    if (token?.sub) {
-      userId = token.sub;
-      userName = (token.name as string) || null;
-      userEmail = (token.email as string) || null;
-      authMethod = "nextauth";
-      console.log("User authenticated via NextAuth token:", {
-        userId,
-        userEmail,
+    try {
+      const token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: process.env.NODE_ENV === "production",
       });
+
+      if (token?.sub) {
+        userId = token.sub;
+        userName = (token.name as string) || null;
+        userEmail = (token.email as string) || null;
+        authMethod = "nextauth";
+        console.log("User authenticated via NextAuth token:", {
+          userId,
+          userEmail,
+        });
+      } else {
+        console.log("No valid NextAuth token found");
+      }
+    } catch (tokenError) {
+      console.error("Error extracting NextAuth token:", tokenError);
     }
 
     // If we couldn't get the user ID from the token, try the cookie
     if (!userId) {
-      const userCookie = cookies().get("user")?.value;
+      try {
+        const cookieStore = cookies();
+        const userCookie = cookieStore.get("user");
 
-      if (userCookie) {
-        try {
-          const userData = JSON.parse(decodeURIComponent(userCookie));
-          if (userData?.id) {
-            userId = userData.id;
-            userName = userData.name;
-            userEmail = userData.email;
-            authMethod = "cookie";
-            console.log("User authenticated via cookie:", {
-              userId,
-              userEmail,
-            });
+        if (userCookie?.value) {
+          try {
+            const userData = JSON.parse(decodeURIComponent(userCookie.value));
+            if (userData?.id) {
+              userId = userData.id;
+              userName = userData.name;
+              userEmail = userData.email;
+              authMethod = "cookie";
+              console.log("User authenticated via cookie:", {
+                userId,
+                userEmail,
+              });
+            }
+          } catch (err) {
+            console.error("Failed to parse user cookie:", err);
           }
-        } catch (err) {
-          console.error("Failed to parse user cookie:", err);
+        } else {
+          console.log("No user cookie found");
         }
+      } catch (cookieError) {
+        console.error("Error accessing cookies:", cookieError);
       }
+    }
+
+    // Check authorization header as a last resort
+    if (!userId && request.headers.get("authorization")) {
+      try {
+        const authHeader = request.headers.get("authorization");
+        if (authHeader?.startsWith("Bearer ")) {
+          const token = authHeader.substring(7);
+          // Implement your token validation logic here
+          // This is just a placeholder
+          console.log("Found Authorization header, attempting to validate");
+        }
+      } catch (authError) {
+        console.error("Error processing Authorization header:", authError);
+      }
+    }
+
+    // Log all request headers for debugging
+    if (!userId) {
+      console.log("Authentication failed. Dumping request headers:");
+      request.headers.forEach((value, key) => {
+        console.log(`${key}: ${value}`);
+      });
     }
 
     // If we still couldn't get the user ID, fail the request
@@ -133,6 +172,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, description, location, metadata } = body;
 
+    console.log("Request validated, creating job with data:", {
+      title,
+      location,
+      posterId: userId,
+    });
+
     if (!title || !description || !location) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -148,7 +193,7 @@ export async function POST(request: NextRequest) {
         location,
         status: "PLANNING",
         posterId: userId,
-        metadata: metadata,
+        metadata: metadata || {},
       },
       include: {
         poster: {
@@ -159,6 +204,11 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    console.log("Job created successfully:", {
+      id: job.id,
+      title: job.title,
     });
 
     // Send email notification if we have the email
@@ -190,6 +240,8 @@ export async function POST(request: NextRequest) {
           subject,
           html: content,
         });
+
+        console.log("Confirmation email sent to", emailToUse);
       } catch (emailError) {
         console.error("Error sending confirmation email:", emailError);
       }
@@ -199,7 +251,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating job:", error);
     return NextResponse.json(
-      { error: "Failed to create job" },
+      { error: "Failed to create job", message: (error as Error).message },
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }

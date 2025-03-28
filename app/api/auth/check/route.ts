@@ -6,6 +6,11 @@ import { cookies } from "next/headers";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  console.log(
+    "[AUTH CHECK API] Request received at:",
+    new Date().toISOString()
+  );
+
   // Add cache control headers to prevent caching
   const headers = new Headers();
   headers.set(
@@ -70,39 +75,82 @@ export async function GET(request: NextRequest) {
     const isAuthenticated = !!token || !!cookieUser;
 
     if (isAuthenticated) {
-      // Extract user information
+      // Extract user information from either token or cookie
       const userInfo = {
-        id: token?.id || token?.sub,
-        email: token?.email,
-        name: token?.name,
-        role: token?.role || "USER",
+        id: token?.sub || cookieUser?.id,
+        email: token?.email || cookieUser?.email,
+        name: token?.name || cookieUser?.name,
+        role: token?.role || cookieUser?.role || "USER",
       };
 
-      // Set a more accessible user-role cookie to help with admin checks
-      // This avoids having to decode the JWT token in different places
-      const cookieStore = cookies();
-      cookieStore.set("user-role", String(userInfo.role), {
-        httpOnly: false, // Allow JavaScript access
-        path: "/",
-        maxAge: 60 * 60 * 24, // 1 day
-        sameSite: "lax",
-        secure:
-          process.env.NODE_ENV === "production" ||
-          process.env.NEXTAUTH_URL?.startsWith("https"),
-      });
+      console.log(
+        "[AUTH CHECK API] Authentication successful, user info:",
+        userInfo
+      );
 
-      return new NextResponse(
-        JSON.stringify({
+      // Create a response object
+      const response = NextResponse.json(
+        {
           authenticated: true,
           method: token ? "token" : "cookie",
           user: userInfo,
-        }),
+        },
         {
           status: 200,
           headers,
         }
       );
+
+      // Set multiple auth cookies to maximize compatibility
+      const cookieStore = cookies();
+
+      // Set the user cookie (serialized user object)
+      cookieStore.set("user", JSON.stringify(userInfo), {
+        httpOnly: false, // Allow JavaScript access
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      // Set a simpler user ID cookie
+      cookieStore.set("user_id", String(userInfo.id), {
+        httpOnly: false,
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      // Set a JWT-based auth token for API calls
+      const authToken = Buffer.from(
+        JSON.stringify({
+          id: userInfo.id,
+          email: userInfo.email,
+          exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
+        })
+      ).toString("base64");
+
+      cookieStore.set("auth_token", authToken, {
+        httpOnly: false, // Allow JavaScript to access for API calls
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      // Also set a standard role cookie
+      cookieStore.set("user-role", String(userInfo.role), {
+        httpOnly: false, // Allow JavaScript access
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      return response;
     } else {
+      console.log("[AUTH CHECK API] Authentication failed");
       return new NextResponse(
         JSON.stringify({
           authenticated: false,

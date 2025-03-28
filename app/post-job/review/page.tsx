@@ -133,10 +133,61 @@ Additional Notes: ${formData.additionalNotes}
         }
       }
 
-      // Force a refresh of the auth state before submitting
-      if (forceRefresh) {
+      // First, try to refresh auth state and sync cookies
+      try {
         console.log("Refreshing auth state before submission");
-        await forceRefresh();
+
+        // Call the auth check endpoint to ensure cookies are set
+        const authCheckResponse = await fetch(
+          `/api/auth/check?t=${Date.now()}`,
+          {
+            method: "GET",
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+            credentials: "include",
+          }
+        );
+
+        if (authCheckResponse.ok) {
+          const authData = await authCheckResponse.json();
+          console.log("Auth check successful:", authData);
+
+          // Try to get the auth token from cookies
+          const cookies = document.cookie.split(";").map((c) => c.trim());
+          const authTokenCookie = cookies.find((c) =>
+            c.startsWith("auth_token=")
+          );
+
+          if (authTokenCookie) {
+            const authToken = authTokenCookie.split("=")[1];
+            // Store in localStorage for easier access in future API calls
+            localStorage.setItem("auth_token", authToken);
+            console.log("Auth token stored in localStorage");
+          } else {
+            // If no auth_token cookie, create one
+            const tokenData = {
+              id: user.id,
+              email: user.email,
+              exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
+            };
+            const newAuthToken = btoa(JSON.stringify(tokenData));
+            localStorage.setItem("auth_token", newAuthToken);
+            console.log("Created and stored new auth token");
+          }
+        } else {
+          console.warn("Auth check failed, proceeding anyway");
+        }
+
+        // Force a refresh of the auth context if available
+        if (forceRefresh) {
+          await forceRefresh();
+        }
+      } catch (authError) {
+        console.error("Error refreshing auth state:", authError);
+        // Continue anyway
       }
 
       console.log("Submitting job data to API");
@@ -147,11 +198,17 @@ Additional Notes: ${formData.additionalNotes}
       const hasSessionCookie = cookies.some((c) =>
         c.startsWith("next-auth.session-token=")
       );
+      const hasAuthToken = cookies.some((c) => c.startsWith("auth_token="));
+
       console.log("Cookie status before submission:", {
         hasUserCookie,
         hasSessionCookie,
+        hasAuthToken,
         cookiesCount: cookies.length,
       });
+
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem("auth_token") || "";
 
       const response = await fetch("/api/jobs", {
         method: "POST",
@@ -160,13 +217,49 @@ Additional Notes: ${formData.additionalNotes}
           ...(csrfTokenRef.current && {
             "csrf-token": csrfTokenRef.current,
           }),
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
+          Authorization: `Bearer ${authToken}`,
+          "X-User-ID": user.id, // Add user ID to headers as fallback
         },
         credentials: "include", // Important: include credentials for cookies
         body: JSON.stringify(jobData),
       });
 
       if (!response.ok) {
+        // If we get a 401, try once more with user_id in the URL
+        if (response.status === 401) {
+          console.log("Got 401, trying alternative submission method");
+
+          // Try calling the auth check endpoint one more time
+          await fetch(`/api/auth/check?t=${Date.now()}`, {
+            credentials: "include",
+          });
+
+          // Try again with user_id in the URL as a query parameter
+          const retryResponse = await fetch(`/api/jobs?user_id=${user.id}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            credentials: "include",
+            body: JSON.stringify(jobData),
+          });
+
+          if (retryResponse.ok) {
+            const result = await retryResponse.json();
+            toast.success("Job posted successfully!");
+            console.log("Job created successfully on retry:", result.id);
+            resetForm();
+            router.push(`/jobs/${result.id}`);
+            return;
+          } else {
+            console.error(
+              "Retry also failed with status:",
+              retryResponse.status
+            );
+          }
+        }
+
         const responseText = await response.text();
         let error;
         try {

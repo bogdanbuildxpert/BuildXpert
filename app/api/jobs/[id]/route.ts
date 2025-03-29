@@ -1,8 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserFromRequest } from "@/lib/auth-utils";
+import { getToken } from "next-auth/jwt";
 import { getProcessedTemplate, transporter } from "@/lib/email";
 import { deleteImage } from "@/lib/supabase-client";
+
+// Helper function to get authenticated user from request
+async function getAuthenticatedUser(req: NextRequest) {
+  try {
+    // Log headers for debugging
+    console.log("Jobs API - Auth headers:", {
+      authHeader: req.headers.get("authorization"),
+      cookieHeader: req.headers.get("cookie")?.substring(0, 100) + "...", // Truncate for log clarity
+    });
+
+    // Get the NextAuth token with explicit options
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+      cookieName: "next-auth.session-token",
+    });
+
+    // Debug log
+    if (token) {
+      console.log("Token found in jobs API:", {
+        id: token.sub,
+        email: token.email,
+        role: token.role,
+      });
+
+      return {
+        id: token.sub as string,
+        email: token.email as string,
+        name: token.name as string,
+        role: token.role as string,
+      };
+    } else {
+      console.log("No valid token found in jobs API request");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error authenticating user:", error);
+    return null;
+  }
+}
 
 // GET a specific job by ID
 export async function GET(
@@ -43,8 +84,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Get the current user from the request
-    const user = await getUserFromRequest(request);
+    // Get the current user from the request using NextAuth
+    const user = await getAuthenticatedUser(request);
 
     if (!user) {
       console.error("Authentication failed for job update. Request details:", {
@@ -187,7 +228,7 @@ export async function DELETE(
 ) {
   try {
     // Get the current user from the request
-    const user = await getUserFromRequest(request);
+    const user = await getAuthenticatedUser(request);
 
     if (!user) {
       console.error(

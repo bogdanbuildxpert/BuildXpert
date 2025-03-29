@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
 import { transporter } from "@/lib/email";
 import { cookies } from "next/headers";
+
+// Create a dedicated Prisma client for this route
+const prisma = new PrismaClient();
 
 // Define the ContactStatus enum to match Prisma schema
 type ContactStatus = "NEW" | "REVIEWED" | "RESPONDED" | "ARCHIVED";

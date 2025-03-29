@@ -386,76 +386,111 @@ export const sendContactNotificationEmail = async (contactData: {
     contactData;
 
   try {
+    console.log("Starting sendContactNotificationEmail function");
     const appUrl = getAppUrl();
     const adminUrl = `${appUrl}/admin/contacts`;
-    const { subject: emailSubject, content } = await getProcessedTemplate(
-      "contact_notification",
-      {
-        name,
-        email,
-        phone: phone || "Not provided",
-        subject,
-        message: message.replace(/\n/g, "<br>"),
-        preferredContact: preferredContact === "PHONE" ? "Phone" : "Email",
-        date: new Date().toLocaleString(),
-        adminUrl,
-      }
-    );
+
+    let emailSubject = `New Contact Form Submission: ${subject}`;
+    let content = "";
+
+    // Try to get the template, but fall back gracefully if there are issues
+    try {
+      console.log("Attempting to get email template: contact_notification");
+      const templateResult = await getProcessedTemplate(
+        "contact_notification",
+        {
+          name,
+          email,
+          phone: phone || "Not provided",
+          subject,
+          message: message.replace(/\n/g, "<br>"),
+          preferredContact: preferredContact === "PHONE" ? "Phone" : "Email",
+          date: new Date().toLocaleString(),
+          adminUrl,
+        }
+      );
+      emailSubject = templateResult.subject;
+      content = templateResult.content;
+      console.log("Successfully loaded email template");
+    } catch (templateError) {
+      console.error("Error loading email template:", templateError);
+      // Fall back to hardcoded template
+      content = `
+        <h2 style="color: #333; margin-bottom: 20px;">New Contact Form Submission</h2>
+        <p>A new contact form has been submitted on the BuildXpert website.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="margin-top: 0;">Contact Details:</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
+          <p><strong>Preferred Contact Method:</strong> ${
+            preferredContact === "PHONE" ? "Phone" : "Email"
+          }</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>Message:</strong></p>
+          <div style="background-color: white; padding: 10px; border-radius: 3px;">
+            ${message.replace(/\n/g, "<br>")}
+          </div>
+          <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+        
+        <p>You can view and manage all contact submissions in the <a href="${adminUrl}" style="color: #0070f3;">admin dashboard</a>.</p>
+      `;
+      console.log("Using fallback template for notification email");
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || "bogdan@buildxpert.ie";
+    console.log(`Sending notification email to admin: ${adminEmail}`);
+
+    // Use a simple string format for the from field to avoid type issues
+    const fromName = "BuildXpert Notifications";
+    const fromEmail = process.env.EMAIL_SERVER_USER || "";
+    const fromHeader = `"${fromName}" <${fromEmail}>`;
 
     const mailOptions = {
-      from: {
-        name: "BuildXpert Notifications",
-        address: process.env.EMAIL_SERVER_USER || "",
-      },
-      to: process.env.ADMIN_EMAIL || "bogdan@buildxpert.ie",
+      from: fromHeader,
+      to: adminEmail,
       subject: emailSubject,
       text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
       html: createEmailLayout(content),
       replyTo: email,
     };
 
-    await transporter.sendMail(mailOptions);
+    console.log("Mail options prepared:", {
+      from: fromHeader,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+    });
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(
+        "Email sent successfully, message ID:",
+        info?.messageId || "unknown"
+      );
+
+      return {
+        success: true,
+        messageId: info?.messageId || null,
+      };
+    } catch (mailError) {
+      console.error("Error during mail transport:", mailError);
+      throw mailError; // Re-throw to be caught by outer catch
+    }
   } catch (error) {
     console.error("Error sending contact notification email:", error);
-    // Fallback to hardcoded template if database template fails
-    const appUrl = getAppUrl();
-    const adminUrl = `${appUrl}/admin/contacts`;
-    const content = `
-      <h2 style="color: #333; margin-bottom: 20px;">New Contact Form Submission</h2>
-      <p>A new contact form has been submitted on the BuildXpert website.</p>
-      
-      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="margin-top: 0;">Contact Details:</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
-        <p><strong>Preferred Contact Method:</strong> ${
-          preferredContact === "PHONE" ? "Phone" : "Email"
-        }</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <p><strong>Message:</strong></p>
-        <div style="background-color: white; padding: 10px; border-radius: 3px;">
-          ${message.replace(/\n/g, "<br>")}
-        </div>
-        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
-      </div>
-      
-      <p>You can view and manage all contact submissions in the <a href="${adminUrl}" style="color: #0070f3;">admin dashboard</a>.</p>
-    `;
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
 
-    const mailOptions = {
-      from: {
-        name: "BuildXpert Notifications",
-        address: process.env.EMAIL_SERVER_USER || "",
-      },
-      to: process.env.ADMIN_EMAIL || "bogdan@buildxpert.ie",
-      subject: `New Contact Form Submission: ${subject}`,
-      text: `New contact form submission from ${name} (${email}). Subject: ${subject}`,
-      html: createEmailLayout(content),
-      replyTo: email,
+    // Don't throw - just return error info
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
     };
-
-    await transporter.sendMail(mailOptions);
   }
 };
 
@@ -559,5 +594,10 @@ if (typeof module !== "undefined" && module.exports) {
     createEmailLayout,
     sendPasswordResetEmail,
     sendVerificationEmail,
+    sendContactConfirmationEmail,
+    sendContactNotificationEmail,
+    getProcessedTemplate,
+    sendEmail,
+    isEmailSafeToSend,
   };
 }

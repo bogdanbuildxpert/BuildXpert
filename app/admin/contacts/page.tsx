@@ -43,6 +43,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -59,7 +60,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash, Phone, Mail } from "lucide-react";
+import { Trash, Phone, Mail, MessageSquare } from "lucide-react";
 
 // Define the Contact type
 type Contact = {
@@ -101,6 +102,11 @@ export default function ContactsPage() {
     contactEmail: "",
     responseSubject: "",
     responseMessage: "",
+  });
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState({
+    name: "",
+    message: "",
   });
   const [sendingResponse, setSendingResponse] = useState(false);
   const [deletingContactId, setDeletingContactId] = useState<string | null>(
@@ -284,6 +290,15 @@ export default function ContactsPage() {
     }
   };
 
+  // Open message dialog
+  const openMessageDialog = (contact: Contact) => {
+    setSelectedMessage({
+      name: contact.name,
+      message: contact.message,
+    });
+    setMessageDialogOpen(true);
+  };
+
   if (isLoading || (user && user.role !== "ADMIN")) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -371,8 +386,17 @@ export default function ContactsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {contact.message}
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          className="flex items-center text-left px-2 py-1 hover:bg-slate-100 rounded"
+                          onClick={() => openMessageDialog(contact)}
+                        >
+                          <span className="max-w-xs truncate mr-1">
+                            {contact.message}
+                          </span>
+                          <MessageSquare className="h-4 w-4 ml-1 flex-shrink-0 text-slate-400" />
+                        </Button>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusBadgeColor(contact.status)}>
@@ -564,6 +588,26 @@ export default function ContactsPage() {
             <Button onClick={handleSendResponse} disabled={sendingResponse}>
               {sendingResponse ? "Sending..." : "Send Response"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message Viewer Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Message from {selectedMessage.name}</DialogTitle>
+            <DialogDescription>Full message content</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-slate-50 p-4 rounded-md">
+              <p className="whitespace-pre-wrap">{selectedMessage.message}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>

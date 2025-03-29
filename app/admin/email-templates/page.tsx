@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Eye, Save } from "lucide-react";
+import { Pencil, Eye } from "lucide-react";
 import Image from "next/image";
 
 // Define the EmailTemplate type
@@ -216,28 +216,71 @@ export default function EmailTemplatesPage() {
 
   return (
     <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Email Templates</h1>
-
-      {templates.length === 0 ? (
-        <p>No email templates found.</p>
-      ) : (
-        <div className="grid gap-4">
-          {templates.map((template) => (
-            <div
-              key={template.id}
-              className="border p-4 rounded-lg cursor-pointer hover:bg-gray-50"
-              onClick={() =>
-                router.push(`/admin/email-templates/${template.id}`)
-              }
-            >
-              <h2 className="text-xl font-semibold">{template.name}</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Last updated: {new Date(template.updatedAt).toLocaleString()}
-              </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Email Templates</CardTitle>
+          <CardDescription>
+            Manage the email templates used for automated communications
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {templates.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No email templates found</p>
             </div>
-          ))}
-        </div>
-      )}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Template Name</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {templates.map((template) => (
+                  <TableRow key={template.id}>
+                    <TableCell className="font-medium">
+                      {formatTemplateName(template.name)}
+                    </TableCell>
+                    <TableCell>{template.subject}</TableCell>
+                    <TableCell>{template.description}</TableCell>
+                    <TableCell>
+                      {formatDistanceToNow(new Date(template.updatedAt), {
+                        addSuffix: true,
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openPreviewDialog(template)}
+                          className="flex items-center"
+                        >
+                          <Eye className="mr-1 h-4 w-4" />
+                          Preview
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(template)}
+                          className="flex items-center"
+                        >
+                          <Pencil className="mr-1 h-4 w-4" />
+                          Edit
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Edit Template Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
@@ -379,7 +422,6 @@ export default function EmailTemplatesPage() {
             </Button>
             <Button onClick={handleSaveTemplate} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
-              {!saving && <Save className="ml-2 h-4 w-4" />}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -422,7 +464,6 @@ export default function EmailTemplatesPage() {
               }}
             >
               Edit Template
-              <Pencil className="ml-2 h-4 w-4" />
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -61,6 +61,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Trash, Phone, Mail, MessageSquare } from "lucide-react";
+import { fetchAuthAPI } from "@/lib/fetch-utils";
+import { signOut } from "next-auth/react";
 
 // Define the Contact type
 type Contact = {
@@ -134,16 +136,33 @@ export default function ContactsPage() {
         url += `&status=${status}`;
       }
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Failed to fetch contacts");
-      }
+      const data = await fetchAuthAPI<{
+        contacts: Contact[];
+        pagination: Pagination;
+      }>(url);
 
-      const data = await response.json();
       setContacts(data.contacts);
       setPagination(data.pagination);
     } catch (error) {
       console.error("Error fetching contacts:", error);
+
+      // Check if this is an authentication error
+      const errorMessage = (error as Error).message || "";
+      if (
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("401")
+      ) {
+        toast.error("Your session has expired. Please log in again.");
+        // Sign out and redirect to login
+        await signOut({
+          redirect: true,
+          callbackUrl: `/login?from=${encodeURIComponent(
+            window.location.pathname
+          )}`,
+        });
+      } else {
+        toast.error("Failed to load contacts. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -152,22 +171,17 @@ export default function ContactsPage() {
   // Update contact status
   const updateContactStatus = async (id: string, status: string) => {
     try {
-      const response = await fetch("/api/admin/contacts", {
+      await fetchAuthAPI("/api/admin/contacts", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id, status }),
+        body: { id, status },
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update contact status");
-      }
 
       // Refresh contacts
       fetchContacts(pagination.page, statusFilter);
+      toast.success("Contact status updated");
     } catch (error) {
       console.error("Error updating contact status:", error);
+      toast.error("Failed to update contact status");
     }
   };
 
@@ -213,36 +227,27 @@ export default function ContactsPage() {
 
     try {
       setSendingResponse(true);
-      const response = await fetch("/api/admin/contacts", {
+      await fetchAuthAPI("/api/admin/contacts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           contactId: responseData.contactId,
           responseSubject: responseData.responseSubject,
           responseMessage: responseData.responseMessage,
-        }),
+        },
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success("Response email sent successfully");
-        setResponseDialogOpen(false);
-        // Reset response form
-        setResponseData({
-          contactId: "",
-          contactName: "",
-          contactEmail: "",
-          responseSubject: "",
-          responseMessage: "",
-        });
-        // Refresh contacts to update status
-        fetchContacts(pagination.page, statusFilter);
-      } else {
-        toast.error(data.error || "Failed to send response email");
-      }
+      toast.success("Response email sent successfully");
+      setResponseDialogOpen(false);
+      // Reset response form
+      setResponseData({
+        contactId: "",
+        contactName: "",
+        contactEmail: "",
+        responseSubject: "",
+        responseMessage: "",
+      });
+      // Refresh contacts to update status
+      fetchContacts(pagination.page, statusFilter);
     } catch (error) {
       console.error("Error sending response:", error);
       toast.error("An error occurred while sending the response");

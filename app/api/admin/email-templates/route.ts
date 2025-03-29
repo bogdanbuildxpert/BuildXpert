@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { cookies } from "next/headers";
 import { PrismaClient } from "@prisma/client";
+import { getToken } from "next-auth/jwt";
 
-// Mark this route as dynamic since it uses cookies
+// Mark this route as dynamic since it uses authentication
 export const dynamic = "force-dynamic";
 
 // Create a Prisma client instance specifically for this route
@@ -11,57 +11,35 @@ export const dynamic = "force-dynamic";
 const prismaClient = new PrismaClient();
 
 // Helper function to check if user is admin
-function isAdmin(req: Request) {
+async function isAdmin(req: NextRequest): Promise<boolean> {
   try {
-    // Get the session cookie
-    const cookieStore = cookies();
+    // Log headers for debugging
+    console.log("Email templates - Auth headers:", {
+      authHeader: req.headers.get("authorization"),
+      cookieHeader: req.headers.get("cookie")?.substring(0, 100) + "...", // Truncate for log clarity
+    });
 
-    // First check for NextAuth.js session token
-    const sessionToken = cookieStore.get("next-auth.session-token");
-    if (sessionToken && sessionToken.value) {
-      // Instead of trying to decode the JWT (which causes errors),
-      // check for the existence of the admin role cookie or header
-      const userRole = cookieStore.get("user-role");
-      if (userRole && userRole.value) {
-        return userRole.value === "ADMIN" || userRole.value === "admin";
-      }
+    // Get the NextAuth token with explicit options
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+      cookieName: "next-auth.session-token",
+    });
+
+    // Debug log
+    if (token) {
+      console.log("Token found:", {
+        id: token.sub,
+        email: token.email,
+        role: token.role,
+      });
+    } else {
+      console.log("No valid token found in request");
     }
 
-    // Check for user cookie as fallback
-    const userCookie = cookieStore.get("user");
-    if (userCookie && userCookie.value) {
-      try {
-        const user = JSON.parse(userCookie.value);
-        return user && (user.role === "ADMIN" || user.role === "admin");
-      } catch (parseError) {
-        console.error("Error parsing user cookie:", parseError);
-      }
-    }
-
-    // Check for Authorization header as last resort
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-      try {
-        // Safer token parsing - avoid atob which is causing the error
-        const base64Url = token.split(".")[1];
-        if (!base64Url) return false;
-
-        // Use safer base64 decoding with proper padding
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-        const jsonPayload = Buffer.from(base64 + padding, "base64").toString();
-
-        // Parse and check role
-        const decodedToken = JSON.parse(jsonPayload);
-        return decodedToken.role === "ADMIN" || decodedToken.role === "admin";
-      } catch (tokenError) {
-        console.error("Error safely decoding token:", tokenError);
-        return false;
-      }
-    }
-
-    return false;
+    // Check if token exists and has admin role
+    return !!token && (token.role === "ADMIN" || token.role === "admin");
   } catch (error) {
     console.error("Error checking admin status:", error);
     return false;
@@ -69,10 +47,10 @@ function isAdmin(req: Request) {
 }
 
 // GET - Retrieve all email templates
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     // Check if user is authenticated and is an admin
-    if (!isAdmin(req)) {
+    if (!(await isAdmin(req))) {
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 401 }
@@ -98,10 +76,10 @@ export async function GET(req: Request) {
 }
 
 // POST - Update an email template
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     // Check if user is authenticated and is an admin
-    if (!isAdmin(req)) {
+    if (!(await isAdmin(req))) {
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 401 }

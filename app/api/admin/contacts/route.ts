@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { transporter } from "@/lib/email";
-import { cookies } from "next/headers";
+import { getToken } from "next-auth/jwt";
 
 // Create a dedicated Prisma client for this route
 const prisma = new PrismaClient();
@@ -9,32 +9,42 @@ const prisma = new PrismaClient();
 // Define the ContactStatus enum to match Prisma schema
 type ContactStatus = "NEW" | "REVIEWED" | "RESPONDED" | "ARCHIVED";
 
-// Mark this route as dynamic since it uses cookies
+// Mark this route as dynamic since it uses authentication
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    // Check if user is authenticated and is an admin using cookies
-    const userCookie = cookies().get("user")?.value;
+    // Get token from NextAuth JWT - log the headers for debugging
+    console.log("Auth headers received:", {
+      authHeader: req.headers.get("authorization"),
+      cookieHeader: req.headers.get("cookie"),
+    });
 
-    if (!userCookie) {
+    // Try to get the token with explicit options
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+      cookieName: "next-auth.session-token",
+    });
+
+    // Debug log token presence
+    console.log(
+      "Token check result:",
+      token ? "Token found" : "No token found"
+    );
+
+    // Check if user is authenticated and is an admin
+    if (!token) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 403 }
+        { error: "Unauthorized. Authentication required." },
+        { status: 401 }
       );
     }
 
-    let userData;
-    try {
-      userData = JSON.parse(userCookie);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid user data." },
-        { status: 403 }
-      );
-    }
-
-    if (userData.role !== "ADMIN" && userData.role !== "admin") {
+    // Check if user has admin role
+    const userRole = token.role as string;
+    if (userRole !== "ADMIN" && userRole !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }
@@ -81,29 +91,27 @@ export async function GET(req: Request) {
 }
 
 // Update contact status
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
   try {
-    // Check if user is authenticated and is an admin using cookies
-    const userCookie = cookies().get("user")?.value;
+    // Use NextAuth token to check admin access with explicit options
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+      cookieName: "next-auth.session-token",
+    });
 
-    if (!userCookie) {
+    // Check if user is authenticated and is an admin
+    if (!token) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 403 }
+        { error: "Unauthorized. Authentication required." },
+        { status: 401 }
       );
     }
 
-    let userData;
-    try {
-      userData = JSON.parse(userCookie);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid user data." },
-        { status: 403 }
-      );
-    }
-
-    if (userData.role !== "ADMIN" && userData.role !== "admin") {
+    // Check if user has admin role
+    const userRole = token.role as string;
+    if (userRole !== "ADMIN" && userRole !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }
@@ -135,29 +143,25 @@ export async function PATCH(req: Request) {
 }
 
 // Send response email to contact
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // Check if user is authenticated and is an admin using cookies
-    const userCookie = cookies().get("user")?.value;
+    // Use NextAuth token to check admin access
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-    if (!userCookie) {
+    // Check if user is authenticated and is an admin
+    if (!token) {
       return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 403 }
+        { error: "Unauthorized. Authentication required." },
+        { status: 401 }
       );
     }
 
-    let userData;
-    try {
-      userData = JSON.parse(userCookie);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid user data." },
-        { status: 403 }
-      );
-    }
-
-    if (userData.role !== "ADMIN" && userData.role !== "admin") {
+    // Check if user has admin role
+    const userRole = token.role as string;
+    if (userRole !== "ADMIN" && userRole !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized. Admin access required." },
         { status: 403 }

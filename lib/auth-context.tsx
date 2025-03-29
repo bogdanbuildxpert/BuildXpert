@@ -202,15 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: (session.user as any).role || "USER",
       };
 
-      // Call the auth check endpoint to set the user-role cookie for admin routes
-      fetch("/api/auth/check", {
-        credentials: "include",
-        headers: {
-          "Cache-Control": "no-cache, no-store, max-age=0",
-        },
-      }).catch((err) => {
-        console.warn("Failed to check auth status:", err);
-      });
+      // Remove custom auth check endpoint call and rely solely on NextAuth
 
       setUser(userData);
       setIsAuthenticated(true);

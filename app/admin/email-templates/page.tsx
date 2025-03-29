@@ -35,6 +35,8 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, Eye } from "lucide-react";
 import Image from "next/image";
+import { fetchAuthAPI } from "@/lib/fetch-utils";
+import { signOut } from "next-auth/react";
 
 // Define the EmailTemplate type
 type EmailTemplate = {
@@ -83,23 +85,30 @@ export default function EmailTemplatesPage() {
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/email-templates", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Important for cookies
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch templates");
-      }
-
-      const data = await response.json();
+      const data = await fetchAuthAPI<{ templates: EmailTemplate[] }>(
+        "/api/admin/email-templates"
+      );
       setTemplates(data.templates || []);
     } catch (error) {
       console.error("Error fetching templates:", error);
-      toast.error("Error loading email templates");
+
+      // Check if this is an authentication error
+      const errorMessage = (error as Error).message || "";
+      if (
+        errorMessage.includes("Unauthorized") ||
+        errorMessage.includes("401")
+      ) {
+        toast.error("Your session has expired. Please log in again.");
+        // Sign out and redirect to login
+        await signOut({
+          redirect: true,
+          callbackUrl: `/login?from=${encodeURIComponent(
+            window.location.pathname
+          )}`,
+        });
+      } else {
+        toast.error("Error loading email templates");
+      }
     } finally {
       setLoading(false);
     }
@@ -132,31 +141,21 @@ export default function EmailTemplatesPage() {
     try {
       setSaving(true);
 
-      const response = await fetch(
+      await fetchAuthAPI<{ success: boolean; template: EmailTemplate }>(
         `/api/admin/email-templates/${editedTemplate.id}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+          body: {
             subject: editedTemplate.subject,
             content: editedTemplate.content,
-          }),
-          credentials: "include", // Important for cookies
+          },
         }
       );
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success("Email template updated successfully");
-        setEditDialogOpen(false);
-        // Refresh templates
-        fetchTemplates();
-      } else {
-        toast.error(data.error || "Failed to update email template");
-      }
+      toast.success("Email template updated successfully");
+      setEditDialogOpen(false);
+      // Refresh templates
+      fetchTemplates();
     } catch (error) {
       console.error("Error updating email template:", error);
       toast.error("An error occurred while updating the template");

@@ -205,6 +205,13 @@ export async function middleware(request: NextRequest) {
     path.startsWith("/post-job/") ||
     path.startsWith("/projects");
 
+  // Special handling for admin users accessing post-job related pages
+  // This ensures admins can access the job posting functionality
+  if (isAdmin && path.startsWith("/post-job/")) {
+    console.log(`Allowing admin access to ${path} for job posting`);
+    return response;
+  }
+
   // If it's an admin-protected route and user is not admin, redirect to login
   if (isAdminProtectedRoute && !isAdmin) {
     console.log(

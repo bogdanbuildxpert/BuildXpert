@@ -198,6 +198,12 @@ export async function POST(req: Request) {
         text: `Thank you for contacting BuildXpert! We have received your message regarding "${subject}" and will respond within 1-2 business days.`,
         html: createEmailLayout(emailContent),
         replyTo: process.env.EMAIL_SERVER_USER || "",
+        headers: {
+          "List-Unsubscribe": `<${getAppUrl()}/unsubscribe?email=${encodeURIComponent(
+            email
+          )}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       };
 
       const userEmailResult = await transporter.sendMail(mailOptions);
@@ -281,6 +287,12 @@ export async function POST(req: Request) {
         text: `New contact form submission from ${fullName} (${email}). Subject: ${subject}`,
         html: createEmailLayout(emailContent),
         replyTo: email,
+        headers: {
+          "List-Unsubscribe": `<${getAppUrl()}/unsubscribe?email=${encodeURIComponent(
+            adminEmail
+          )}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       };
 
       const adminEmailResult = await transporter.sendMail(adminMailOptions);

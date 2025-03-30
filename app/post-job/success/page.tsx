@@ -38,7 +38,10 @@ export default function SuccessPage() {
           <Button onClick={() => router.push("/jobs")}>View All Jobs</Button>
         )}
         <div>
-          <Button variant="outline" onClick={() => router.push("/post-job")}>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/post-job/client-info")}
+          >
             Post Another Job
           </Button>
         </div>

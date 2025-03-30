@@ -343,6 +343,12 @@ export async function POST(request: NextRequest) {
           to: emailToUse,
           subject,
           html: content,
+          headers: {
+            "List-Unsubscribe": `<${
+              process.env.NEXT_PUBLIC_APP_URL || "https://buildxpert.ie"
+            }/unsubscribe?email=${encodeURIComponent(emailToUse)}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
         });
 
         console.log("Confirmation email sent to", emailToUse);

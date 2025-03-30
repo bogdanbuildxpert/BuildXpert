@@ -202,8 +202,9 @@ export async function sendEmail(options: {
     address: string;
   };
   replyTo?: string;
+  listUnsubscribe?: string;
 }) {
-  const { to, subject, text, html, from, replyTo } = options;
+  const { to, subject, text, html, from, replyTo, listUnsubscribe } = options;
 
   try {
     // Check if email is safe to send
@@ -228,6 +229,13 @@ export async function sendEmail(options: {
       text: text || html.replace(/<[^>]*>/g, ""), // Strip HTML if text not provided
       html,
       replyTo,
+      headers: {
+        // Add List-Unsubscribe header for better deliverability
+        "List-Unsubscribe":
+          listUnsubscribe ||
+          `<${getAppUrl()}/unsubscribe?email=${encodeURIComponent(to)}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
     };
 
     // Send the email

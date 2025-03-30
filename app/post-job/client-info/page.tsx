@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "next-themes";
+import { RefreshCw } from "lucide-react";
 
 // Create a memoized form input component to avoid re-renders
 const MemoizedFormInput = React.memo(
@@ -63,7 +64,7 @@ MemoizedFormInput.displayName = "MemoizedFormInput";
 
 // Main component wrapped with React.memo
 function ClientInfoPage() {
-  const { state, updateField, nextStep, errors, isFieldRequired } =
+  const { state, updateField, nextStep, resetForm, errors, isFieldRequired } =
     useJobForm();
   const { formData } = state;
   const { theme } = useTheme();
@@ -72,6 +73,10 @@ function ClientInfoPage() {
   const handleNext = useCallback(() => {
     nextStep();
   }, [nextStep]);
+
+  const handleReset = useCallback(() => {
+    resetForm();
+  }, [resetForm]);
 
   const handleEmailChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,7 +115,18 @@ function ClientInfoPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Client Information</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Client Information</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReset}
+          className="flex items-center gap-1"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Start New Job
+        </Button>
+      </div>
       <p className="text-muted-foreground">
         Let us know how painters can contact you about this job.
         <span className="text-sm block mt-1 text-red-500 dark:text-red-400">

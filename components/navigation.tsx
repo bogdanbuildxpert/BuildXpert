@@ -117,7 +117,7 @@ export function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button size="sm" asChild>
-                    <Link href="/post-job">Post a Job</Link>
+                    <Link href="/post-job/client-info">Post a Job</Link>
                   </Button>
                 </>
               ) : (
@@ -126,7 +126,7 @@ export function Navigation() {
                     <Link href="/login">Login</Link>
                   </Button>
                   <Button size="sm" asChild>
-                    <Link href="/post-job">Post a Job</Link>
+                    <Link href="/post-job/client-info">Post a Job</Link>
                   </Button>
                 </>
               )}
@@ -219,7 +219,10 @@ export function Navigation() {
                     Logout
                   </Button>
                   <Button size="sm" asChild>
-                    <Link href="/post-job" onClick={() => setIsMenuOpen(false)}>
+                    <Link
+                      href="/post-job/client-info"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       Post a Job
                     </Link>
                   </Button>
@@ -232,7 +235,10 @@ export function Navigation() {
                     </Link>
                   </Button>
                   <Button size="sm" asChild>
-                    <Link href="/post-job" onClick={() => setIsMenuOpen(false)}>
+                    <Link
+                      href="/post-job/client-info"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       Post a Job
                     </Link>
                   </Button>

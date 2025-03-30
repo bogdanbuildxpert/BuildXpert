@@ -1,89 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
   useJobForm,
   JobFormStep,
   stepPaths,
 } from "@/lib/contexts/job-form-context";
+import { useAuth } from "@/lib/auth-context";
 
 export default function PostJobLanding() {
   const router = useRouter();
-  const { setStep, resetForm } = useJobForm();
-  const [redirecting, setRedirecting] = useState(false);
+  const { setStep } = useJobForm();
+  const { user } = useAuth();
 
-  // Redirect to the first step after a longer delay to ensure everything is loaded
+  // Immediately redirect to the first step
   useEffect(() => {
-    // Only start the redirection process if we haven't already started it
-    if (!redirecting) {
-      setRedirecting(true);
+    // If we're already rendering this page, we can safely continue with the redirect
+    // This helps avoid middleware/auth redirection conflicts
+    console.log(
+      "Post job landing page - initiating direct client-info navigation"
+    );
 
-      // Increase timeout to 1500ms to ensure context and auth are fully initialized
-      const timer = setTimeout(() => {
-        try {
-          console.log("Redirecting to client-info page...");
-          const targetPath = stepPaths[JobFormStep.ClientInfo];
-
-          // Use window.location for more reliable navigation in production
-          if (process.env.NODE_ENV === "production") {
-            window.location.href = targetPath;
-          } else {
-            router.push(targetPath);
-          }
-        } catch (error) {
-          console.error("Navigation error:", error);
-          // Fallback to direct URL if something goes wrong
-          window.location.href = "/post-job/client-info";
-        }
-      }, 1500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [router, redirecting]);
-
-  const handleStartNew = () => {
-    resetForm();
+    const targetPath = stepPaths[JobFormStep.ClientInfo];
     setStep(JobFormStep.ClientInfo);
 
-    try {
-      router.push(stepPaths[JobFormStep.ClientInfo]);
-    } catch (error) {
-      console.error("Navigation error:", error);
-      window.location.href = "/post-job/client-info";
-    }
-  };
+    // Use window.location.replace for immediate redirection
+    // This is more direct than router.push and ensures we go straight to client-info
+    window.location.replace(targetPath);
+  }, [setStep]);
 
-  const handleContinue = () => {
-    setStep(JobFormStep.ClientInfo);
-
-    try {
-      router.push(stepPaths[JobFormStep.ClientInfo]);
-    } catch (error) {
-      console.error("Navigation error:", error);
-      window.location.href = "/post-job/client-info";
-    }
-  };
-
+  // Return a minimal loading placeholder that won't trigger other redirects
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] space-y-8 text-center">
-      <h1 className="text-3xl font-bold">Post a Painting Job</h1>
-      <p className="text-lg text-muted-foreground max-w-md">
-        Find the perfect painter for your project by creating a detailed job
-        posting.
-      </p>
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Button onClick={handleStartNew} size="lg">
-          Start New Job
-        </Button>
-        <Button onClick={handleContinue} variant="outline" size="lg">
-          Continue Draft
-        </Button>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Starting your job posting in a moment...
-      </p>
+    <div className="flex justify-center items-center h-screen">
+      <p className="text-muted-foreground">Redirecting to job form...</p>
     </div>
   );
 }

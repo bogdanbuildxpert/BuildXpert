@@ -162,7 +162,7 @@ export function ClientJobList({ userId }: ClientJobListProps) {
           </div>
         </div>
         <Button asChild>
-          <Link href="/post-job">
+          <Link href="/post-job/client-info">
             <Plus className="h-4 w-4 mr-2" />
             Post a New Job
           </Link>
@@ -183,7 +183,7 @@ export function ClientJobList({ userId }: ClientJobListProps) {
           </p>
           {jobs.length === 0 && (
             <Button asChild>
-              <Link href="/post-job">
+              <Link href="/post-job/client-info">
                 <Plus className="h-4 w-4 mr-2" />
                 Post a Job
               </Link>

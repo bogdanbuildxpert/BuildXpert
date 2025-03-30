@@ -1,9 +1,8 @@
 generator client {
-  provider   = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters", "postgresqlExtensions"]
-  binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
-  // This ensures the hook runs on all environments including Vercel
-  pregenerate = "node ./pregenerate.js"
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "windows"]
+  pregenerate     = "node ./pregenerate.js"
 }
 
 datasource db {
@@ -11,26 +10,24 @@ datasource db {
   url          = env("DATABASE_URL")
   directUrl    = env("DIRECT_URL")
   relationMode = "foreignKeys"
-  // Add pgBouncer support
-  extensions   = []
 }
 
 model User {
-  id               String    @id @default(cuid())
-  name             String?
-  email            String    @unique
-  password         String
-  role             UserRole  @default(CLIENT)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  emailVerified    DateTime?
-  cookiePreferences Json?    @default("{\"essential\":true,\"analytics\":true,\"preferences\":true}")
-  postedJobs       Job[]     @relation("JobPoster")
-  projects         Project[]
-  reviews          Review[]  @relation("ReviewAuthor")
-  receivedReviews  Review[]  @relation("ReviewReceiver")
-  services         Service[] @relation("ServiceProvider")
-  jobs             Job[]     @relation("AppliedJobs")
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  password          String
+  role              UserRole  @default(CLIENT)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  emailVerified     DateTime?
+  cookiePreferences Json?     @default("{\"analytics\": true, \"essential\": true, \"preferences\": true}")
+  postedJobs        Job[]     @relation("JobPoster")
+  projects          Project[]
+  reviews           Review[]  @relation("ReviewAuthor")
+  receivedReviews   Review[]  @relation("ReviewReceiver")
+  services          Service[] @relation("ServiceProvider")
+  Job_AppliedJobs   Job[]     @relation("AppliedJobs")
 
   @@index([role])
 }
@@ -80,17 +77,17 @@ model Material {
 }
 
 model Job {
-  id          String        @id @default(cuid())
-  title       String
-  description String
-  location    String?
-  posterId    String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  metadata    Json?
-  status      ProjectStatus @default(PLANNING)
-  poster      User          @relation("JobPoster", fields: [posterId], references: [id])
-  applicants  User[]        @relation("AppliedJobs")
+  id               String        @id @default(cuid())
+  title            String
+  description      String
+  location         String?
+  posterId         String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  metadata         Json?
+  status           ProjectStatus @default(PLANNING)
+  poster           User          @relation("JobPoster", fields: [posterId], references: [id])
+  User_AppliedJobs User[]        @relation("AppliedJobs")
 
   @@index([posterId])
   @@index([status])
@@ -151,7 +148,7 @@ model EmailTemplate {
 }
 
 model EmailBounce {
-  id             String       @id @default(cuid())
+  id             String       @id
   email          String
   messageId      String?
   bounceType     BounceType   @default(UNDETERMINED)
@@ -164,10 +161,33 @@ model EmailBounce {
   retryCount     Int          @default(0)
   retryAfter     DateTime?
   handled        Boolean      @default(false)
-  
-  @@index([email])
+
   @@index([bounceType])
+  @@index([email])
   @@index([status])
+  @@index([timestamp])
+}
+
+model EmailPreference {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  marketingEmails    Boolean   @default(true)
+  notificationEmails Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model EmailLog {
+  id        String    @id @default(cuid())
+  email     String
+  action    String    // e.g., SENT, OPENED, CLICKED, BOUNCED, UNSUBSCRIBE
+  details   String?
+  timestamp DateTime  @default(now())
+
+  @@index([email])
+  @@index([action])
   @@index([timestamp])
 }
 
@@ -198,12 +218,6 @@ enum Priority {
   URGENT
 }
 
-enum JobStatus {
-  OPEN
-  CLOSED
-  FILLED
-}
-
 enum ContactMethod {
   EMAIL
   PHONE
@@ -216,15 +230,21 @@ enum ContactStatus {
   ARCHIVED
 }
 
+enum BounceStatus {
+  NEW
+  PROCESSED
+  IGNORED
+  RESOLVED
+}
+
 enum BounceType {
   HARD
   SOFT
   UNDETERMINED
 }
 
-enum BounceStatus {
-  NEW
-  PROCESSED
-  IGNORED
-  RESOLVED
+enum JobStatus {
+  OPEN
+  CLOSED
+  FILLED
 }

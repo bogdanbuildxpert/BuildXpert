@@ -149,6 +149,8 @@ export async function POST(req: NextRequest) {
     const token = await getToken({
       req,
       secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production",
+      cookieName: "next-auth.session-token",
     });
 
     // Check if user is authenticated and is an admin
@@ -246,6 +248,12 @@ export async function POST(req: NextRequest) {
       text: `Hello ${contact.name}, Thank you for contacting BuildXpert. Here is our response to your inquiry: ${responseMessage}`,
       html: emailHtml,
       replyTo: process.env.EMAIL_SERVER_USER || "",
+      headers: {
+        "List-Unsubscribe": `<${
+          process.env.NEXT_PUBLIC_APP_URL || "https://buildxpert.ie"
+        }/unsubscribe?email=${encodeURIComponent(contact.email)}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
     });
 
     // Update contact status to RESPONDED

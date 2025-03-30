@@ -226,7 +226,7 @@ export function AdminJobList() {
             </AlertDialogContent>
           </AlertDialog>
           <Button asChild>
-            <Link href="/post-job">Post a Job</Link>
+            <Link href="/post-job/client-info">Post a Job</Link>
           </Button>
         </div>
       </div>

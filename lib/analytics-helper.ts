@@ -52,8 +52,11 @@ export const trackPageView = (url: string): void => {
   }
 
   try {
-    window.gtag("config", process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID as string, {
+    const measurementId =
+      process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-DE3MCE7DKR";
+    window.gtag("config", measurementId, {
       page_path: url,
+      anonymize_ip: true,
     });
   } catch (error) {
     console.error(`Error tracking page view for "${url}":`, error);

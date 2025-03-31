@@ -129,6 +129,29 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.png" type="image/png" />
         <link rel="shortcut icon" href="/favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/favicon.png" />
+
+        {/* Google tag (gtag.js) - For verification only */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-DE3MCE7DKR"
+        ></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-DE3MCE7DKR', {
+                'send_page_view': false // Don't send automatic page views
+              });
+              // Mark as requiring consent
+              gtag('consent', 'default', {
+                'analytics_storage': 'denied'
+              });
+            `,
+          }}
+        />
+
         <script
           dangerouslySetInnerHTML={{
             __html: `

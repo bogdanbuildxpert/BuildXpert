@@ -30,10 +30,24 @@ export async function fetchAuthAPI<T>(
       headers["Authorization"] = `Bearer ${sessionToken}`;
     }
 
+    // Also try secure cookie variant if the regular one isn't found
+    if (!sessionToken) {
+      const secureSessionToken = getCookie("__Secure-next-auth.session-token");
+      if (secureSessionToken) {
+        headers["Authorization"] = `Bearer ${secureSessionToken}`;
+      }
+    }
+
     // Also add CSRF token if available
     const csrfToken = getCookie("next-auth.csrf-token");
     if (csrfToken) {
       headers["X-CSRF-Token"] = csrfToken.split("|")[0];
+    }
+
+    // Add User cookie info to a custom header if available
+    const userCookie = getCookie("user");
+    if (userCookie) {
+      headers["X-User-Data"] = userCookie;
     }
   }
 
@@ -88,8 +102,9 @@ function getCookie(name: string): string | undefined {
   const cookies = document.cookie.split(";");
   for (let i = 0; i < cookies.length; i++) {
     const cookie = cookies[i].trim();
-    if (cookie.startsWith(name + "=")) {
-      return cookie.substring(name.length + 1);
+    // More robust way to check for cookie name
+    if (cookie.indexOf(name + "=") === 0) {
+      return decodeURIComponent(cookie.substring(name.length + 1));
     }
   }
   return undefined;

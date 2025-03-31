@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    console.log("Session status:", status);
+    // console.log("Session status:", status);
 
     if (status === "loading") {
       // Keep previous state during loading
@@ -207,12 +207,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       setIsAuthenticated(true);
       resetInactivityTimer();
-      console.log("User authenticated with data:", userData);
+      // console.log("User authenticated with data:", userData);
     } else {
       // Clear user data when not authenticated
       setUser(null);
       setIsAuthenticated(false);
-      console.log("User not authenticated, cleared user state");
+      // console.log("User not authenticated, cleared user state");
     }
 
     setIsLoading(false);

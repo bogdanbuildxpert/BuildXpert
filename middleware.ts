@@ -99,24 +99,24 @@ export async function middleware(request: NextRequest) {
     const isDebugRoute =
       path.includes("/debug") || path.startsWith("/api/auth/");
     if (token && isDebugRoute) {
-      console.log(`Found NextAuth token for ${path}:`, {
-        sub: token.sub,
-        email: token.email,
-        role: token.role || "not set",
-      });
+      // console.log(`Found NextAuth token for ${path}:`, {
+      //   sub: token.sub,
+      //   email: token.email,
+      //   role: token.role || "not set",
+      // });
     } else if (!token && isDebugRoute) {
-      console.log(`No NextAuth token found for ${path}`);
+      // console.log(`No NextAuth token found for ${path}`);
 
       // Fallback check for cookies manually only in debug routes
       const cookieHeader = request.headers.get("cookie");
       if (cookieHeader) {
         if (cookieHeader.includes("next-auth.session-token")) {
-          console.log(
-            `Session token cookie exists but getToken returned null. Possible decoding issue.`
-          );
+          // console.log(
+          //   `Session token cookie exists but getToken returned null. Possible decoding issue.`
+          // );
         }
       } else {
-        console.log(`No cookie header found in request`);
+        // console.log(`No cookie header found in request`);
       }
     }
   } catch (tokenError) {
@@ -139,11 +139,11 @@ export async function middleware(request: NextRequest) {
     path === "/login";
 
   if (shouldLogAuthStatus) {
-    console.log(`Auth status for ${path}:`, {
-      isAuthenticated,
-      isAdmin,
-      hasToken: !!token,
-    });
+    // console.log(`Auth status for ${path}:`, {
+    //   isAuthenticated,
+    //   isAdmin,
+    //   hasToken: !!token,
+    // });
   }
 
   // If user is already authenticated and trying to access login/register pages,
@@ -154,13 +154,13 @@ export async function middleware(request: NextRequest) {
   ) {
     // If admin user, redirect to admin dashboard
     if (isAdmin) {
-      console.log(
-        `Redirecting authenticated admin from ${path} to /admin/dashboard`
-      );
+      // console.log(
+      //   `Redirecting authenticated admin from ${path} to /admin/dashboard`
+      // );
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
     // Regular users to homepage
-    console.log(`Redirecting authenticated user from ${path} to /`);
+    // console.log(`Redirecting authenticated user from ${path} to /`);
     return NextResponse.redirect(new URL("/", request.url));
   }
 
@@ -179,9 +179,9 @@ export async function middleware(request: NextRequest) {
       path === "/api/auth/verify-email" &&
       process.env.NODE_ENV === "production"
     ) {
-      console.log(
-        "Production verify-email API access detected, forcing to client route"
-      );
+      // console.log(
+      //   "Production verify-email API access detected, forcing to client route"
+      // );
       const token = request.nextUrl.searchParams.get("token");
 
       if (token) {
@@ -208,23 +208,23 @@ export async function middleware(request: NextRequest) {
   // Special handling for admin users accessing post-job related pages
   // This ensures admins can access the job posting functionality
   if (isAdmin && path.startsWith("/post-job/")) {
-    console.log(`Allowing admin access to ${path} for job posting`);
+    // console.log(`Allowing admin access to ${path} for job posting`);
     return response;
   }
 
   // If it's an admin-protected route and user is not admin, redirect to login
   if (isAdminProtectedRoute && !isAdmin) {
-    console.log(
-      `Access to admin protected route ${path} denied, redirecting to login`
-    );
+    // console.log(
+    //   `Access to admin protected route ${path} denied, redirecting to login`
+    // );
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
   // If it's a protected route and user is not authenticated, redirect to login
   if (isAuthProtectedRoute && !isAuthenticated) {
-    console.log(
-      `Access to protected route ${path} denied, redirecting to login`
-    );
+    // console.log(
+    //   `Access to protected route ${path} denied, redirecting to login`
+    // );
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

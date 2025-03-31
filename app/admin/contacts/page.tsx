@@ -274,21 +274,44 @@ export default function ContactsPage() {
   const handleDeleteContact = async (id: string) => {
     try {
       setIsDeleting(true);
+      setDeletingContactId(id);
+
+      // Use fetchAuthAPI with additional error handling
       const response = await fetch(`/api/admin/contacts/${id}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important for sending cookies with request
       });
 
-      if (response.ok) {
-        toast.success("Contact deleted successfully");
-        // Refresh the contacts list
-        fetchContacts(pagination.page, statusFilter);
-      } else {
-        const data = await response.json();
-        toast.error(data.error || "Failed to delete contact");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `API request failed with status ${response.status}`
+        );
       }
+
+      const data = await response.json();
+      toast.success(data.message || "Contact deleted successfully");
+
+      // Refresh the contacts list
+      fetchContacts(pagination.page, statusFilter);
     } catch (error) {
       console.error("Error deleting contact:", error);
-      toast.error("An error occurred while deleting the contact");
+
+      // Log more details for debugging
+      if (error instanceof Error) {
+        console.error("Delete error details:", {
+          message: error.message,
+          name: error.name,
+        });
+      }
+
+      toast.error(
+        (error as Error).message ||
+          "An error occurred while deleting the contact"
+      );
     } finally {
       setIsDeleting(false);
       setDeletingContactId(null);

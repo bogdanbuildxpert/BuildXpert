@@ -22,6 +22,19 @@ const CookieConsent = dynamic(
   { ssr: false }
 );
 
+// Dynamically import GoogleAnalytics with no SSR
+const GoogleAnalytics = dynamic(
+  () =>
+    import("@/components/GoogleAnalytics").then((mod) => mod.GoogleAnalytics),
+  { ssr: false }
+);
+
+// Dynamically import PageAnalytics with no SSR
+const PageAnalytics = dynamic(
+  () => import("@/components/PageAnalytics").then((mod) => mod.PageAnalytics),
+  { ssr: false }
+);
+
 const inter = Inter({ subsets: ["latin"] });
 
 // Update the metadata title and description
@@ -144,19 +157,7 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        {/* Global Site Tag - Google Analytics */}
-        <Script
-          strategy="afterInteractive"
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`}
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}');
-          `}
-        </Script>
+        {/* Removed direct Google Analytics scripts */}
 
         <Providers>
           <AuthProvider>
@@ -168,6 +169,8 @@ export default function RootLayout({
             </div>
             <InactivityMonitor />
             <CookieConsent />
+            <GoogleAnalytics />
+            <PageAnalytics />
           </AuthProvider>
         </Providers>
       </body>

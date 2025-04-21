@@ -196,7 +196,7 @@ export async function middleware(request: NextRequest) {
 
   // Define protected routes that require admin access
   const isAdminProtectedRoute =
-    path.startsWith("/admin/dashboard") || path.startsWith("/admin/contacts");
+    path.startsWith("/admin/") && !path.startsWith("/admin/login");
 
   // Define routes that require authentication (any user)
   const isAuthProtectedRoute =
